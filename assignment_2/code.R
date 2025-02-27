@@ -25,7 +25,7 @@ cols = as.list(1:ncol(data))
 names(cols) = names(data)
 
 # Initialize correlations.csv.
-correlations <- cor(numeric_data, use = "complete.obs")
+correlations <- cor(data, use = "complete.obs")
 
 # Convert correlations to a data frame.
 cor_df <- as.data.frame(correlations)
