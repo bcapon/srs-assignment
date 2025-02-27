@@ -24,16 +24,16 @@ data = data[,-SIMD.cols]
 cols = as.list(1:ncol(data))
 names(cols) = names(data)
 
-# Initialize correlations.csv
+# Initialize correlations.csv.
 correlations <- cor(numeric_data, use = "complete.obs")
 
-# Convert correlations to a data frame
+# Convert correlations to a data frame.
 cor_df <- as.data.frame(correlations)
 cor_df <- cbind(Variable = rownames(cor_df), cor_df)
 rownames(cor_df) <- NULL
 
 cor_df <- data.frame(cor_df)
-# Save correlations to a CSV file
+# Save correlations to a CSV file.
 write.csv(cor_df, "correlations.csv", row.names = FALSE)
 
 # Print results
