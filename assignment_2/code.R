@@ -1,10 +1,15 @@
-setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment")
+setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
+
+# NOTES #
+# Q1 is the 20% of areas with lowest participation in higher education
+
+# READ DATA #
 
 data = read.csv("data.csv")
 head(data)
 
 # Remove 'X.1' column and 'X' cols, R provides indices for us.
-data = data[,-c(1,2)]
+data = data[,-c(1,2,3)]
 head(data)
 
 # Get column indices and names by using a named list/vector as a 'dictionary'.
@@ -19,8 +24,11 @@ data = data[,-SIMD.cols]
 cols = as.list(1:ncol(data))
 names(cols) = names(data)
 
-# EDA
+# EDA #
 
-# DATA CLEANING/FEATURE ENGINEERING?
+plot(data)
 
-# MODELS
+# DATA CLEANING/FEATURE ENGINEERING? #
+
+
+# MODELS #
