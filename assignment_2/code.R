@@ -1,7 +1,9 @@
-setwd("/Users/cyrusseyrafi/srs-assignment/assignment_2")
+#setwd("/Users/cyrusseyrafi/srs-assignment/assignment_2")
+setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
 
 # NOTES #
 # Q1 is the 20% of areas with lowest participation in higher education
+# Need to make all columns but INSITUTION_NAME numeric.
 
 # READ DATA #
 
@@ -11,6 +13,14 @@ head(data)
 # Remove 'X.1' column and 'X' cols, R provides indices for us.
 data = data[,-c(1,2,3)]
 head(data)
+str(data)
+
+# FIX CONTINUATION BY LOOKING AT IT:
+data$continuation
+
+# APPEARS TO BE "n/a" converting it to string column
+data$continuation <- gsub("n/a", NA, data$continuation)
+data$continuation <- as.numeric(data$continuation)
 
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 cols = as.list(1:ncol(data))
@@ -20,28 +30,23 @@ names(cols) = names(data)
 SIMD.cols <- which(substr(names(cols),1,4) == "SIMD")
 data = data[,-SIMD.cols]
 
+str(data)
+
 # Reset the cols data. 
 cols = as.list(1:ncol(data))
 names(cols) = names(data)
 
-# Initialize correlations.csv.
-correlations <- cor(data, use = "complete.obs")
+# NEED TO GET RID OF NA VALUES FIRST.
+data <- na.omit(data)
+cor(data[,-1])
+#plot(data)
 
-# Convert correlations to a data frame.
-cor_df <- as.data.frame(correlations)
-cor_df <- cbind(Variable = rownames(cor_df), cor_df)
-rownames(cor_df) <- NULL
-
-cor_df <- data.frame(cor_df)
-# Save correlations to a CSV file.
-write.csv(cor_df, "correlations.csv", row.names = FALSE)
 
 # Print results
-print(cor_df)
 
 # EDA #
 
-plot(data)
+#plot(data)
 
 # DATA CLEANING/FEATURE ENGINEERING? #
 
