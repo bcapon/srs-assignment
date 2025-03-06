@@ -9,6 +9,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 ######                            IMPORTS                               ######
 
 library(ggplot2)
+library(glmnet)
 
 ######                       READ DATA + CLEAN                          ######
 
@@ -134,3 +135,8 @@ plot(baseline_model)
 model2 <- step(baseline_model, direction = "both")
 summary(model2)
 plot(model2)
+
+# LASSO (with CV)
+mod.glm <- cv.glmnet(x = as.matrix(scale(data[, -c(1, 3)])), y = data$satisfied_feedback) ## lasso regression
+mod.glm.mse <- mean((data$satisfied_feedback - predict(mod.glm, newx = as.matrix(scale(data[, -c(1, 3)]))))^2)
+coef(mod.glm) ## show coefficients
