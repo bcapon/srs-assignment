@@ -49,6 +49,39 @@ cor(data[,-1])
 
 #pairs(data[,-1])
 
+# RESIDUAL PLOTS
+residual_plots <- function(model, data, response) {
+  
+  # Extract predicted values.
+  predicted <- predict(model, data, type = "response")
+  
+  # Compute residuals.
+  residuals <- data[[response]] - predicted
+  
+  # Standardize residuals.
+  sigma_hat <- sd(residuals)
+  residuals <- residuals / sigma_hat
+  
+  # Initialize plots.
+  par(mfrow = c(1, 3))
+  
+  ## Residuals vs. Fitted plot.
+  plot(predicted, residuals, main = "Residuals vs. Predicted",
+       xlab = "Predicted Values", ylab = paste("Residuals"), pch = 19)
+  abline(h = 0, col = "red", lty = 2)
+  
+  ## Histogram of Residuals.
+  hist(residuals, breaks = 30, probability = TRUE, 
+       main = "Histogram of Residuals", xlab = paste("Residuals"))
+  curve(dnorm(x, mean = mean(residuals), sd = sd(residuals)), add = TRUE, col = "blue")
+  
+  ## Q-Q Plot.
+  qqnorm(residuals, main = "Q-Q Plot of Residuals")
+  qqline(residuals, col = "red", lwd = 2)
+  
+}
+
+
 # BASLINE MODEL
 baseline_model <- lm(satisfied_feedback ~ ., data = data[,-1])
 summary(baseline_model)
