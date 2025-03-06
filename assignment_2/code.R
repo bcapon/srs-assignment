@@ -4,6 +4,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 # NOTES #
 # Q1 is the 20% of areas with lowest participation in higher education
 # Need to make all columns but INSITUTION_NAME numeric.
+# Canterbury Christ Church Uni seems to have a too high total???
 
 # READ DATA #
 
@@ -41,14 +42,14 @@ data <- na.omit(data)
 cor(data[,-1])
 #plot(data)
 
-
-# Print results
-
 # EDA #
 
+pairs(data[,-1])
+baseline_model <- lm(satisfied_feedback ~ ., data = data[,-1])
+summary(baseline_model)
+plot(baseline_model)
 #plot(data)
 
 # DATA CLEANING/FEATURE ENGINEERING? #
-
 
 # MODELS #
