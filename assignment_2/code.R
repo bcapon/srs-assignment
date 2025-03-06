@@ -6,10 +6,11 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 # Need to make all columns but INSITUTION_NAME numeric.
 # Canterbury Christ Church Uni seems to have a too high total???
 
-# IMPORTS #
-library("ggplot2")
+######                            IMPORTS                               ######
 
-# READ DATA #
+library(ggplot2)
+
+######                       READ DATA + CLEAN                          ######
 
 data = read.csv("data.csv")
 head(data)
@@ -45,9 +46,42 @@ data <- na.omit(data)
 cor(data[,-1])
 #plot(data)
 
-# EDA #
+######                                EDA                               ######
 
 #pairs(data[,-1])
+for(col in names(cols)[-1]){
+  print(col)
+  plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = TRUE) + 
+    theme_minimal()  
+  print(plotted)
+}
+# POLAR4.Q4 bad cor but the rest are good?? Added value and total: bad. Could do
+# feature engineering/transformations on ethnic/gender columns to improve but
+# overall not great.
+
+######                DATA CLEANING/FEATURE ENGINEERING?                ######
+
+satisfied_feedback = data$satisfied_feedback
+satisfied_teaching <- scale(data$satisfied_teaching)
+students_staff_ratio <- scale(data$students_staff_ratio)
+spent_per_student <- scale(data$spent_per_student)
+avg_entry_tariff <- scale(data$avg_entry_tariff)
+career_after_15_month <- scale(data$career_after_15_month)
+continuation <- scale(data$continuation)
+Women <- scale(data$Women)
+Men <- scale(data$Men)
+INSITUTION_NAME <- data$INSTITUTION_NAME
+
+model_data <- data.frame(satisfied_feedback, satisfied_teaching, students_staff_ratio,
+                         spent_per_student, avg_entry_tariff, career_after_15_month,
+                         continuation, Women)
+
+other_ethnic_outlier <- data[which(data$Other.ethnic.group == max(data$Other.ethnic.group)),]
+other_ethnic_outlier
+
+######                                MODELS                            ######
 
 # RESIDUAL PLOTS
 residual_plots <- function(model, data, response) {
@@ -81,36 +115,12 @@ residual_plots <- function(model, data, response) {
   
 }
 
-
 # BASLINE MODEL
-baseline_model <- lm(satisfied_feedback ~ ., data = data[,-1])
+baseline_model <- lm(satisfied_feedback ~ ., data = model_data)
 summary(baseline_model)
-#plot(baseline_model)
+plot(baseline_model)
 
 # STEP MODEL
-#model2 <- step(baseline_model, direction = "both")
-#summary(model2)
-#plot(model2)
-#plot(data)
-
-for(col in names(cols)[-1]){
-  print(col)
-  plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = TRUE) + 
-    theme_minimal()  
-  print(plotted)
-}
-# POLAR4.Q4 bad cor but the rest are good?? Added value and total bad. Could do
-# feature engineering/transformations on ethnic/gender columns to improve but
-# overall not great.
-
-
-model3 <- lm(satisfied_feedback ~ satisfied_teaching + students_staff_ratio + spent_per_student +
-               avg_entry_tariff + career_after_15_month + continuation + Women, data = data)
-summary(model3)
+model2 <- step(baseline_model, direction = "both")
+summary(model2)
 plot(model2)
-
-# DATA CLEANING/FEATURE ENGINEERING? #
-
-# MODELS #
