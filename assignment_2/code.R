@@ -28,7 +28,7 @@ data$continuation <- gsub("n/a", NA, data$continuation)
 data$continuation <- as.numeric(data$continuation)
 
 # Get column indices and names by using a named list/vector as a 'dictionary'.
-cols = as.list(1:ncol(data))
+cols = c(1:ncol(data))
 names(cols) = names(data)
 
 # Remove SIMD data as useless.
@@ -38,7 +38,7 @@ data = data[,-SIMD.cols]
 str(data)
 
 # Reset the cols data. 
-cols = as.list(1:ncol(data))
+cols = c(1:ncol(data))
 names(cols) = names(data)
 
 # NEED TO GET RID OF NA VALUES FIRST.
@@ -63,6 +63,11 @@ for(col in names(cols)[-1]){
 
 ######                DATA CLEANING/FEATURE ENGINEERING?                ######
 
+apply(data[,cols[c("Men", "Women")]], 1, sum)
+apply(data[,cols[c("White.ethnic.group", "Black.ethnic.group",
+          "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
+apply(data[,cols[c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", "POLAR4.Q3")]], 1, sum)
+
 satisfied_feedback = data$satisfied_feedback
 satisfied_teaching <- scale(data$satisfied_teaching)
 students_staff_ratio <- scale(data$students_staff_ratio)
@@ -74,12 +79,18 @@ Women <- scale(data$Women)
 Men <- scale(data$Men)
 INSITUTION_NAME <- data$INSTITUTION_NAME
 
-model_data <- data.frame(satisfied_feedback, satisfied_teaching, students_staff_ratio,
-                         spent_per_student, avg_entry_tariff, career_after_15_month,
-                         continuation, Women)
+model_data <- data.frame(satisfied_feedback, satisfied_teaching, 
+                         students_staff_ratio, spent_per_student, 
+                         avg_entry_tariff, career_after_15_month,continuation, 
+                         Women)
 
-other_ethnic_outlier <- data[which(data$Other.ethnic.group == max(data$Other.ethnic.group)),]
+other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
 other_ethnic_outlier
+
+
+# Get column indices and names by using a named list/vector as a 'dictionary'.
+cols = c(1:ncol(model_data))
+names(cols) = names(model_data)
 
 ######                                MODELS                            ######
 
@@ -112,7 +123,6 @@ residual_plots <- function(model, data, response) {
   ## Q-Q Plot.
   qqnorm(residuals, main = "Q-Q Plot of Residuals")
   qqline(residuals, col = "red", lwd = 2)
-  
 }
 
 # BASLINE MODEL
