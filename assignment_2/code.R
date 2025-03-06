@@ -13,6 +13,7 @@ library(glmnet)
 
 ######                       READ DATA + CLEAN                          ######
 
+# Read the data and read the first few rows.
 data = read.csv("data.csv")
 head(data)
 
@@ -47,6 +48,10 @@ data <- na.omit(data)
 cor(data[,-1])
 #plot(data)
 
+# Get the index for the data through the INSTITUTION_NAME
+INSITUTION_NAME <- data$INSTITUTION_NAME
+rownames(data) <- INSITUTION_NAME
+
 ######                                EDA                               ######
 
 #pairs(data[,-1])
@@ -64,34 +69,28 @@ for(col in names(cols)[-1]){
 
 ######                DATA CLEANING/FEATURE ENGINEERING?                ######
 
-apply(data[,cols[c("Men", "Women")]], 1, sum)
-apply(data[,cols[c("White.ethnic.group", "Black.ethnic.group",
-          "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
-apply(data[,cols[c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", "POLAR4.Q3")]], 1, sum)
 
-satisfied_feedback = data$satisfied_feedback
-satisfied_teaching <- scale(data$satisfied_teaching)
-students_staff_ratio <- scale(data$students_staff_ratio)
-spent_per_student <- scale(data$spent_per_student)
-avg_entry_tariff <- scale(data$avg_entry_tariff)
-career_after_15_month <- scale(data$career_after_15_month)
-continuation <- scale(data$continuation)
-Women <- scale(data$Women)
-Men <- scale(data$Men)
-INSITUTION_NAME <- data$INSTITUTION_NAME
+#other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
+#other_ethnic_outlier
+#apply(data[,cols[c("Men", "Women")]], 1, sum)
+#apply(data[,cols[c("White.ethnic.group", "Black.ethnic.group",
+#                   "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
+#apply(data[,cols[c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", "POLAR4.Q3")]], 1, sum)
 
-model_data <- data.frame(satisfied_feedback, satisfied_teaching, 
-                         students_staff_ratio, spent_per_student, 
-                         avg_entry_tariff, career_after_15_month,continuation, 
-                         Women)
+model_data <- data[cols[c("satisfied_feedback", "satisfied_teaching", 
+                          "students_staff_ratio", "spent_per_student",
+                          "avg_entry_tariff", "career_after_15_month",
+                          "continuation", "Women")]]
+model_data[,-1] <- scale(model_data[,-1])
 
-other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
-other_ethnic_outlier
+continuation_sq <- (model_data$continuation)^2
+satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
 
-
+model_data <- cbind(model_data, continuation_sq, satisfied_teaching_sq)
+rownames(model_data) <- INSITUTION_NAME
 # Get column indices and names by using a named list/vector as a 'dictionary'.
-cols = c(1:ncol(model_data))
-names(cols) = names(model_data)
+model_cols = c(1:ncol(model_data))
+names(model_cols) = names(model_data)
 
 ######                                MODELS                            ######
 
@@ -129,14 +128,28 @@ residual_plots <- function(model, data, response) {
 # BASLINE MODEL
 baseline_model <- lm(satisfied_feedback ~ ., data = model_data)
 summary(baseline_model)
+par(mfrow = c(2,2))
 plot(baseline_model)
 
+i = 1
+par(mfrow = c(2,2))
+for(col in names(model_cols)[-1]){
+  if(i%%4 == 0){
+    par(mfrow = c(2,2))
+  }
+  plot(model_data[,col], residuals(baseline_model), xlab = col)
+  abline(h = 0)
+}
+
 # STEP MODEL
-model2 <- step(baseline_model, direction = "both")
-summary(model2)
-plot(model2)
+step_model <- step(baseline_model, direction = "both")
+summary(step_model)
+par(mfrow = c(2,2))
+plot(step_model)
+
 
 # LASSO (with CV)
-mod.glm <- cv.glmnet(x = as.matrix(scale(data[, -c(1, 3)])), y = data$satisfied_feedback) ## lasso regression
-mod.glm.mse <- mean((data$satisfied_feedback - predict(mod.glm, newx = as.matrix(scale(data[, -c(1, 3)]))))^2)
+mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) ## lasso regression
+mod.glm.mse <- mean((model_data$satisfied_feedback - predict(mod.glm, newx = as.matrix(as.matrix(model_data[,-1]))))^2)
 coef(mod.glm) ## show coefficients
+
