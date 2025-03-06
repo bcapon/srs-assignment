@@ -3,7 +3,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 
 # NOTES #
 # Q1 is the 20% of areas with lowest participation in higher education
-# Need to make all columns but INSITUTION_NAME numeric.
+# Need to make all columns but INSTITUTION_NAME numeric.
 # Canterbury Christ Church Uni seems to have a too high total???
 
 ######                            IMPORTS                               ######
@@ -49,8 +49,8 @@ cor(data[,-1])
 #plot(data)
 
 # Get the index for the data through the INSTITUTION_NAME
-INSITUTION_NAME <- data$INSTITUTION_NAME
-rownames(data) <- INSITUTION_NAME
+INSTITUTION_NAME <- data$INSTITUTION_NAME
+rownames(data) <- INSTITUTION_NAME
 
 ######                                EDA                               ######
 
@@ -87,7 +87,7 @@ continuation_sq <- (model_data$continuation)^2
 satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
 
 model_data <- cbind(model_data, continuation_sq, satisfied_teaching_sq)
-rownames(model_data) <- INSITUTION_NAME
+
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 model_cols = c(1:ncol(model_data))
 names(model_cols) = names(model_data)
@@ -141,6 +141,10 @@ for(col in names(model_cols)[-1]){
   abline(h = 0)
 }
 
+# Drop Subject Specific Unis?
+# model_data <- model_data[!(INSITUTION_NAME %in% c("SOAS ", "Goldsmiths ", "University of the Arts London ")),]
+# INSTITUTION_NAME <- rownames(model_data)
+
 # STEP MODEL
 step_model <- step(baseline_model, direction = "both")
 summary(step_model)
@@ -152,4 +156,6 @@ plot(step_model)
 mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) ## lasso regression
 mod.glm.mse <- mean((model_data$satisfied_feedback - predict(mod.glm, newx = as.matrix(as.matrix(model_data[,-1]))))^2)
 coef(mod.glm) ## show coefficients
+
+# JAGS/INLA MODEL
 
