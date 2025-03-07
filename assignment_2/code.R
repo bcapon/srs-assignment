@@ -151,6 +151,47 @@ summary(step_model)
 par(mfrow = c(2,2))
 plot(step_model)
 
+## STEP MODEL WITH 2ND ORDER INTERACTIONS
+base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
+step_model_int <- step(base_model_int, direction = 'backward', trace = 0)
+summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> could use the terms in lasso to get the "most meaningful" ones
+plot(step_model_int)
+
+## function to create interactions manually for lasso
+create.interactions <- function(interaction.names, data){
+  interactions <- interaction.names[grep(':', interaction.names)]
+  for (name in interactions){
+    name.split <- strsplit(name, ':')[[1]]
+    ## get individual names
+    name1 <- name.split[1]
+    name2 <- name.split[2]
+    ## add interaction (= product)
+    data[[name]] <- data[[name1]] * data[[name2]]
+  }
+  return(data)
+}
+
+model_data_glm <- create.interactions(names(coef(step_model_int)), model_data)
+## step can lead to overfitting and unstable results
+mod.glm.step <- cv.glmnet(x = as.matrix(model_data_glm[, -1]), y = model_data_glm$satisfied_feedback)
+coef(mod.glm.step) ## get rid of less significant interactions/covariates
+
+
+# BRMS (BAYESIAN REGRESSION MODELS USING STAN)
+
+## can also use brms (bayesian regression using stan) and the skew normal distribution
+## -> can capture the slightly skewed distribution
+
+## use covariates from lasso (with interactions)
+mod.brms <- brm(satisfied_feedback ~ satisfied_teaching + spent_per_student + avg_entry_tariff
+                + career_after_15_month + continuation + continuation_sq + satisfied_teaching_sq
+                + satisfied_teaching:continuation_sq + students_staff_ratio:Women
+                + spent_per_student:career_after_15_month + avg_entry_tariff:continuation
+                + continuation:Women + Women:satisfied_teaching_sq,
+                data = model_data_glm, family = skew_normal())
+summary(mod.brms)
+pp_check(mod.brms)
+
 
 # LASSO (with CV)
 mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) ## lasso regression
