@@ -5,17 +5,23 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 # Q1 is the 20% of areas with lowest participation in higher education
 # Need to make all columns but INSTITUTION_NAME numeric.
 # Canterbury Christ Church Uni seems to have a too high total???
+# Women:Entry_tariff could be a good interaction
+
 
 ######                            IMPORTS                               ######
 
 library(ggplot2)
 library(glmnet)
+library(brm)
 
 ######                       READ DATA + CLEAN                          ######
 
 # Read the data and read the first few rows.
 data = read.csv("data.csv")
 head(data)
+# Get the index for the data through the INSTITUTION_NAME
+INSTITUTION_NAME <- data$INSTITUTION_NAME
+rownames(data) <- INSTITUTION_NAME
 
 # Remove 'X.1' column and 'X' cols, R provides indices for us.
 data = data[,-c(1,2,3)]
@@ -29,6 +35,19 @@ data$continuation
 data$continuation <- gsub("n/a", NA, data$continuation)
 data$continuation <- as.numeric(data$continuation)
 
+# Look at other NA values in the data by column
+sapply(data, function(x) sum(is.na(x)))
+
+# Look at NA value of continuation. Appears to be Falmouth (Not sure the best way
+# to impute that one, return to later)
+data[is.na(data$cont), ]
+
+# Unsurprisingly Cambridge here (Oxford in most other years too). Assume the same
+# as Oxford due to their rivalry.
+data[is.na(data$satisfied_feedback), ]
+data["Cambridge ","satisfied_teaching"] <- data["Oxford ","satisfied_teaching"]
+data["Cambridge ","satisfied_feedback"] = data["Oxford ","satisfied_feedback"]
+
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 cols = c(1:ncol(data))
 names(cols) = names(data)
@@ -37,20 +56,14 @@ names(cols) = names(data)
 SIMD.cols <- which(substr(names(cols),1,4) == "SIMD")
 data = data[,-SIMD.cols]
 
-str(data)
-
-# Reset the cols data. 
-cols = c(1:ncol(data))
-names(cols) = names(data)
-
 # NEED TO GET RID OF NA VALUES FIRST.
 data <- na.omit(data)
 cor(data[,-1])
-#plot(data)
 
-# Get the index for the data through the INSTITUTION_NAME
-INSTITUTION_NAME <- data$INSTITUTION_NAME
-rownames(data) <- INSTITUTION_NAME
+# Reset the cols data and get the new INSTITUTION_NAME
+cols = c(1:ncol(data))
+names(cols) = names(data)
+INSTITUTION_NAME <- rownames(data) 
 
 ######                                EDA                               ######
 
@@ -69,30 +82,38 @@ for(col in names(cols)[-1]){
 
 ######                DATA CLEANING/FEATURE ENGINEERING?                ######
 
-
 #other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
 #other_ethnic_outlier
 #apply(data[,cols[c("Men", "Women")]], 1, sum)
 #apply(data[,cols[c("White.ethnic.group", "Black.ethnic.group",
-#                   "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
+#                  "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
 #apply(data[,cols[c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", "POLAR4.Q3")]], 1, sum)
 
 model_data <- data[cols[c("satisfied_feedback", "satisfied_teaching", 
                           "students_staff_ratio", "spent_per_student",
                           "avg_entry_tariff", "career_after_15_month",
-                          "continuation", "Women")]]
+                          "continuation", "Women", "Men")]]
 model_data[,-1] <- scale(model_data[,-1])
 
-continuation_sq <- (model_data$continuation)^2
-satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
+G5 <- c("Oxford ", "UCL ", "Imperial College ", "London School of Economics ", 
+        "Cambridge ")
 
-model_data <- cbind(model_data, continuation_sq, satisfied_teaching_sq)
+RG <- c(G5, "Birmingham ", "Bristol ", "Cardiff ", "Durham ", "Edinburgh ",
+        "Exeter ", "Glasgow ", "King's College London ", "Leeds ", "Liverpool ",
+        "Manchester ", "Newcastle ", "Nottingham ",  "Queen Mary ", 
+        "Queen's Belfast", "Sheffield ", "Southampton ", "Warwick ", "York ")
+model_data$G5 <- 0
+model_data[G5,]$G5 <- 1
+model_data$RG <- 0
+model_data[RG,]$RG <- 1
+model_data$continuation_sq <- (model_data$continuation)^2
+model_data$satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
 
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 model_cols = c(1:ncol(model_data))
 names(model_cols) = names(model_data)
 
-######                                MODELS                            ######
+######                                MODELS                             ######
 
 # RESIDUAL PLOTS
 residual_plots <- function(model, data, response) {
@@ -137,6 +158,7 @@ for(col in names(model_cols)[-1]){
   if(i%%4 == 0){
     par(mfrow = c(2,2))
   }
+  print(model_data[,col])
   plot(model_data[,col], residuals(baseline_model), xlab = col)
   abline(h = 0)
 }
@@ -199,4 +221,5 @@ mod.glm.mse <- mean((model_data$satisfied_feedback - predict(mod.glm, newx = as.
 coef(mod.glm) ## show coefficients
 
 # JAGS/INLA MODEL
+
 
