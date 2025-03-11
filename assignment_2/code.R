@@ -6,6 +6,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 # Need to make all columns but INSTITUTION_NAME numeric.
 # Canterbury Christ Church Uni seems to have a too high total???
 # Women:Entry_tariff could be a good interaction
+# Need to fix TOTAL for CCCU if we use that column
 
 
 ######                            IMPORTS                               ######
@@ -27,8 +28,11 @@ rownames(data) <- INSTITUTION_NAME
 data = data[,-c(1,2,3)]
 head(data)
 str(data)
+summary(data)
 
-# FIX CONTINUATION BY LOOKING AT IT:
+# Total seems to have an outlier at the maximum when compared to the 3rd quartile.
+# Can see from summaries that continuation appears to be a character column when
+# it should be numeric. FIX CONTINUATION BY LOOKING AT IT:
 data$continuation
 
 # APPEARS TO BE "n/a" converting it to string column
@@ -85,9 +89,23 @@ for(col in names(cols)[-1]){
 #other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
 #other_ethnic_outlier
 #apply(data[,cols[c("Men", "Women")]], 1, sum)
-#apply(data[,cols[c("White.ethnic.group", "Black.ethnic.group",
-#                  "Asian.ethnic.group", "Other.ethnic.group", "Mixed.ethnic.group")]], 1, sum)
-#apply(data[,cols[c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", "POLAR4.Q3")]], 1, sum)
+ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
+                 "Asian.ethnic.group", "Other.ethnic.group", 
+                 "Mixed.ethnic.group")
+POLAR_cols <- c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", 
+                "POLAR4.Q3")
+sex_cols <- c("Women", "Men")
+
+#rowSums(data[,cols[ethnic_cols]])
+#rowSums(data[,cols[POLAR_cols]])
+#rowSums(data[,cols[sex_cols]])
+
+data[,cols[ethnic_cols]] <- data[,cols[ethnic_cols]] / 
+                            rowSums(data[,cols[ethnic_cols]])
+data[,cols[POLAR_cols]] <- data[,cols[POLAR_cols]] / 
+                            rowSums(data[,cols[POLAR_cols]])
+data[,cols[sex_cols]] <- data[,cols[sex_cols]] / 
+                            rowSums(data[,cols[sex_cols]])
 
 model_data <- data[cols[c("satisfied_feedback", "satisfied_teaching", 
                           "students_staff_ratio", "spent_per_student",
