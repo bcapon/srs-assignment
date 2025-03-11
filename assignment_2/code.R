@@ -13,7 +13,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 
 library(ggplot2)
 library(glmnet)
-library(brm)
+library(brms)
 
 ######                       READ DATA + CLEAN                          ######
 
@@ -222,15 +222,18 @@ coef(mod.glm.step) ## get rid of less significant interactions/covariates
 ## can also use brms (bayesian regression using stan) and the skew normal distribution
 ## -> can capture the slightly skewed distribution
 
-## use covariates from lasso (with interactions)
-mod.brms <- brm(satisfied_feedback ~ satisfied_teaching + spent_per_student + avg_entry_tariff
-                + career_after_15_month + continuation + continuation_sq + satisfied_teaching_sq
-                + satisfied_teaching:continuation_sq + students_staff_ratio:Women
-                + spent_per_student:career_after_15_month + avg_entry_tariff:continuation
-                + continuation:Women + Women:satisfied_teaching_sq,
+## non-excluded features from lasso
+non.excluded <- rownames(res.lasso)[which(res.lasso != 0)][-1]
+## add formula to brms automatically
+brms.formula <- paste(non.excluded, collapse = ' + ')
+
+mod.brms <- brm(as.formula(paste("satisfied_feedback ~", brms.formula)),
                 data = model_data_glm, family = skew_normal())
 summary(mod.brms)
 pp_check(mod.brms)
+## MSE
+post.pred <- colMeans(posterior_predict(mod.brms))
+mse.mod.brms <- mean((model_data_glm$satisfied_feedback - post.pred)^2)
 
 
 # LASSO (with CV)
