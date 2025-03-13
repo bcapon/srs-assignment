@@ -7,7 +7,8 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 # Canterbury Christ Church Uni seems to have a too high total???
 # Women:Entry_tariff could be a good interaction
 # Need to fix TOTAL for CCCU if we use that column
-
+# Also need to fix the outlier in OTHER ETHNIC GROUP.
+# Avg entry tariff and women interaction
 
 ######                            IMPORTS                               ######
 
@@ -110,7 +111,7 @@ data[,cols[sex_cols]] <- data[,cols[sex_cols]] /
 model_data <- data[cols[c("satisfied_feedback", "satisfied_teaching", 
                           "students_staff_ratio", "spent_per_student",
                           "avg_entry_tariff", "career_after_15_month",
-                          "continuation", "Women", "Men")]]
+                          "continuation", "Women")]]
 model_data[,-1] <- scale(model_data[,-1])
 
 G5 <- c("Oxford ", "UCL ", "Imperial College ", "London School of Economics ", 
