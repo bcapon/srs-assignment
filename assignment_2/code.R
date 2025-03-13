@@ -243,4 +243,50 @@ coef(mod.glm) ## show coefficients
 
 # JAGS/INLA MODEL
 
+# Plot histogram
+hist(data$satisfied_teaching, probability = TRUE)
+#, breaks = 30, probability = TRUE, 
+#col = rgb(0, 0, 1, 0.5), border = "black",
+#main = "Histogram with Fitted Distributions", xlab = "Satisfaction Score")
+
+# Generate x values for curves
+x_vals <- seq(min(data$satisfied_teaching), max(data$satisfied_teaching), length.out = 100)
+
+# Fit distributions
+fit_gamma <- fitdistr(data$satisfied_teaching, "gamma")
+fit_lognorm <- fitdistr(data$satisfied_teaching, "lognormal")
+fit_exp <- fitdistr(data$satisfied_teaching, "exponential")
+fit_weibull <- fitdistr(data$satisfied_teaching, "weibull")
+
+# Overlay fitted distribution curves
+curve(dgamma(x, shape = fit_gamma$estimate["shape"], rate = fit_gamma$estimate["rate"]), 
+      col = "red", lwd = 2, add = TRUE)
+
+curve(dlnorm(x, meanlog = fit_lognorm$estimate["meanlog"], sdlog = fit_lognorm$estimate["sdlog"]), 
+      col = "green", lwd = 2, add = TRUE, lty = 2)
+
+curve(dexp(x, rate = fit_exp$estimate["rate"]), 
+      col = "purple", lwd = 2, add = TRUE, lty = 3)
+
+curve(dweibull(x, shape = fit_weibull$estimate["shape"], scale = fit_weibull$estimate["scale"]), 
+      col = "orange", lwd = 2, add = TRUE, lty = 4)
+
+# Add legend
+legend("topright", legend = c("Gamma", "Log-Normal", "Exponential", "Weibull"), 
+       col = c("red", "green", "purple", "orange"), lwd = 2, lty = c(1, 2, 3, 4))
+# Specify a Gamma prior for variance (in the INLA model)
+library(INLA)
+Beta.Prior <- list(mean.intercept = 0, prec.intercept = 0.0001, mean = 0, prec = 0.0001)
+prec.prior <- list(prec = list(prior = "loggamma", param = c(1,0.11)))
+
+model1 <- inla(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg_entry_tariff
+               + career_after_15_month + continuation, data = data, family = "gamma",control.family = list(hyper=prec.prior), control.fixed = Beta.Prior,control.compute = list(cpo=TRUE, waic=TRUE))
+
+cat("WAIC:",model1$waic$waic, "\n")
+cat("NSLCPO:",-sum(log(model1$cpo$cpo)), "\n")
+summary(model)           
+
+model2<- glm(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg_entry_tariff
+             + career_after_15_month + continuation, data = data, family = Gamma)
+summary(model2)
 
