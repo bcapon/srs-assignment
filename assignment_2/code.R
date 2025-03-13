@@ -15,6 +15,8 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 library(ggplot2)
 library(glmnet)
 library(brms)
+library(MASS)
+library(INLA)
 
 ######                       READ DATA + CLEAN                          ######
 
@@ -65,6 +67,10 @@ data = data[,-SIMD.cols]
 data <- na.omit(data)
 cor(data[,-1])
 
+
+#data[,"not_white"] <- 1 - data$White.ethnic.group
+
+
 # Reset the cols data and get the new INSTITUTION_NAME
 cols = c(1:ncol(data))
 names(cols) = names(data)
@@ -89,13 +95,16 @@ for(col in names(cols)[-1]){
 
 #other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
 #other_ethnic_outlier
-#apply(data[,cols[c("Men", "Women")]], 1, sum)
+
+institutional_cols <- c("satisfied_feedback", "satisfied_teaching", 
+                      "students_staff_ratio", "spent_per_student",
+                      "avg_entry_tariff")
+outcome_cols <- c("added_value", "career_after_15_month", "continuation")
 ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
                  "Asian.ethnic.group", "Other.ethnic.group", 
                  "Mixed.ethnic.group")
-POLAR_cols <- c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q5", 
-                "POLAR4.Q3")
-sex_cols <- c("Women", "Men")
+POLAR_cols <- c("POLAR4.Q5", "POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q3")
+sex_cols <- c("Men", "Women")
 
 #rowSums(data[,cols[ethnic_cols]])
 #rowSums(data[,cols[POLAR_cols]])
@@ -107,16 +116,22 @@ data[,cols[POLAR_cols]] <- data[,cols[POLAR_cols]] /
                             rowSums(data[,cols[POLAR_cols]])
 data[,cols[sex_cols]] <- data[,cols[sex_cols]] / 
                             rowSums(data[,cols[sex_cols]])
+data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + data[,"Mixed.ethnic.group"]
 
-model_data <- data[cols[c("satisfied_feedback", "satisfied_teaching", 
-                          "students_staff_ratio", "spent_per_student",
-                          "avg_entry_tariff", "career_after_15_month",
-                          "continuation", "Women")]]
+# Reset the cols data
+cols = c(1:ncol(data))
+names(cols) = names(data)
+
+ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
+                 "Asian.ethnic.group", "Other.Mixed.ethnic.group")
+
+model_data <- data[cols[c(institutional_cols, outcome_cols, sex_cols[-1]
+                          #POLAR_cols[-1], #ethnic_cols[-1]
+                          )]]
 model_data[,-1] <- scale(model_data[,-1])
 
 G5 <- c("Oxford ", "UCL ", "Imperial College ", "London School of Economics ", 
         "Cambridge ")
-
 RG <- c(G5, "Birmingham ", "Bristol ", "Cardiff ", "Durham ", "Edinburgh ",
         "Exeter ", "Glasgow ", "King's College London ", "Leeds ", "Liverpool ",
         "Manchester ", "Newcastle ", "Nottingham ",  "Queen Mary ", 
@@ -125,12 +140,20 @@ model_data$G5 <- 0
 model_data[G5,]$G5 <- 1
 model_data$RG <- 0
 model_data[RG,]$RG <- 1
+
 model_data$continuation_sq <- (model_data$continuation)^2
 model_data$satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
 
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 model_cols = c(1:ncol(model_data))
 names(model_cols) = names(model_data)
+
+# Plot histogram
+hist(data$satisfied_feedback, freq = FALSE, breaks = 10,ylim = c(0,0.12)) 
+# Estimate density
+dens <- density(data$satisfied_feedback)
+# Overlay density curve
+lines(dens, col = "red")
 
 ######                                MODELS                             ######
 
@@ -170,6 +193,29 @@ baseline_model <- lm(satisfied_feedback ~ ., data = model_data)
 summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
+
+# BASLINE MODEL WITH INTERACTIONS
+#result <- c()
+#for(ethnic in ethnic_cols[-1]){
+#  for(POLAR in POLAR_cols[-1]){
+#    result <- c(result, paste(ethnic, ":", POLAR, sep = ""))
+#  }
+#}
+#interactions <- paste(result, collapse = " + ")
+
+#baseline_model_interactions <- lm(as.formula(paste("satisfied_feedback ~ .", 
+ #                               interactions, sep = " + ")), data = model_data)
+
+baseline_model_interactions <- lm(satisfied_feedback ~ . + 
+                                    students_staff_ratio:satisfied_teaching + 
+                                    avg_entry_tariff:continuation + 
+                                    , data = model_data)
+
+summary(baseline_model_interactions)
+par(mfrow = c(2,2))
+plot(baseline_model_interactions)
+
+
 
 i = 1
 par(mfrow = c(2,2))
@@ -215,7 +261,7 @@ create.interactions <- function(interaction.names, data){
 model_data_glm <- create.interactions(names(coef(step_model_int)), model_data)
 ## step can lead to overfitting and unstable results
 mod.glm.step <- cv.glmnet(x = as.matrix(model_data_glm[, -1]), y = model_data_glm$satisfied_feedback)
-coef(mod.glm.step) ## get rid of less significant interactions/covariates
+res.lasso <- coef(mod.glm.step) ## get rid of less significant interactions/covariates
 
 
 # BRMS (BAYESIAN REGRESSION MODELS USING STAN)
@@ -258,7 +304,6 @@ fit_gamma <- fitdistr(data$satisfied_teaching, "gamma")
 fit_lognorm <- fitdistr(data$satisfied_teaching, "lognormal")
 fit_exp <- fitdistr(data$satisfied_teaching, "exponential")
 fit_weibull <- fitdistr(data$satisfied_teaching, "weibull")
-
 # Overlay fitted distribution curves
 curve(dgamma(x, shape = fit_gamma$estimate["shape"], rate = fit_gamma$estimate["rate"]), 
       col = "red", lwd = 2, add = TRUE)
@@ -276,7 +321,7 @@ curve(dweibull(x, shape = fit_weibull$estimate["shape"], scale = fit_weibull$est
 legend("topright", legend = c("Gamma", "Log-Normal", "Exponential", "Weibull"), 
        col = c("red", "green", "purple", "orange"), lwd = 2, lty = c(1, 2, 3, 4))
 # Specify a Gamma prior for variance (in the INLA model)
-library(INLA)
+
 Beta.Prior <- list(mean.intercept = 0, prec.intercept = 0.0001, mean = 0, prec = 0.0001)
 prec.prior <- list(prec = list(prior = "loggamma", param = c(1,0.11)))
 
@@ -285,7 +330,7 @@ model1 <- inla(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg
 
 cat("WAIC:",model1$waic$waic, "\n")
 cat("NSLCPO:",-sum(log(model1$cpo$cpo)), "\n")
-summary(model)           
+summary(model1)           
 
 model2<- glm(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg_entry_tariff
              + career_after_15_month + continuation, data = data, family = Gamma)
