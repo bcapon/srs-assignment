@@ -96,21 +96,67 @@ INSTITUTION_NAME <- rownames(data)
 
 ######                                EDA                               ######
 
+# Split the columns into their different types:
+institutional_cols <- c("satisfied_feedback", "satisfied_teaching", 
+                        "students_staff_ratio", "spent_per_student",
+                        "avg_entry_tariff")
+outcome_cols <- c("added_value", "career_after_15_month", "continuation")
+ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
+                 "Asian.ethnic.group", "Other.ethnic.group", 
+                 "Mixed.ethnic.group")
+POLAR_cols <- c("POLAR4.Q5", "POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q3")
+sex_cols <- c("Men", "Women")
+
 # Plot histogram showing the response with a kde:
-hist(data$satisfied_feedback, freq = FALSE, breaks = 10,ylim = c(0,0.12)) 
+par(mfrow = c(1,1))
+hist(data$satisfied_feedback, freq = FALSE, breaks = 10,ylim = c(0,0.12), col="lightblue") 
 # Estimate density
 dens <- density(data$satisfied_feedback)
 # Overlay density curve
 lines(dens, col = "red")
 
+i = 0
 for(col in names(cols)[-1]){
-  print(col)
-  plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
-    geom_point() +
-    geom_smooth(method = "lm", se = TRUE) + 
-    theme_minimal()  
-  print(plotted)
+  if(i %% 4 == 0){
+    par(mfrow = c(2,2))
+  }
+  # Plot the scatterplot
+  plot(data[,col], data$satisfied_feedback, col="lightblue", main=col, xlab = col)
+  # Fit a linear model and add the line to the scatterplot
+  model <- lm(data$satisfied_feedback ~ data[,col])
+  # Add Regression Line
+  abline(model, col="red")
+  i = i + 1
+  ## GGPLOT2 VERSION
+ # print(col)
+  #plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
+   # geom_point() +
+  #  geom_smooth(method = "lm", se = TRUE) + 
+  #  theme_minimal()  
+  #print(plotted)
 }
+
+# Some boxplots to look at the distribution of all of the covariates grouped
+# by there type side by side:
+par(mfrow = c(1,1))
+boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
+boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
+boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col=rainbow(5))
+
+i = 0
+for(col in names(cols)[-1]){
+  if(i %% 4 == 0){
+    par(mfrow = c(2,2))
+  }
+  hist(data[,col], main = col, xlab = col, col = "lightblue", breaks = 10, freq = FALSE)
+  # Estimate density
+  dens <- density(data[,col])
+  # Overlay density curve
+  lines(dens, col = "red")
+  i = i + 1
+}
+
+
 #pairs(data[,-1])
 # POLAR4.Q4 bad cor but the rest are good?? Added value and total: bad. Could do
 # feature engineering/transformations on ethnic/gender columns to improve but
@@ -122,17 +168,6 @@ for(col in names(cols)[-1]){
 # N.B. we have a large outlier in Birmingham Newman Uni in the Other ethnic group.
 #other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
 #other_ethnic_outlier
-
-# Split the columns into their different types:
-institutional_cols <- c("satisfied_feedback", "satisfied_teaching", 
-                      "students_staff_ratio", "spent_per_student",
-                      "avg_entry_tariff")
-outcome_cols <- c("added_value", "career_after_15_month", "continuation")
-ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
-                 "Asian.ethnic.group", "Other.ethnic.group", 
-                 "Mixed.ethnic.group")
-POLAR_cols <- c("POLAR4.Q5", "POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q3")
-sex_cols <- c("Men", "Women")
 
 # The sums of these rows do not add to 100%. This indicates non respondents so
 # let's assume non-respondents are uniform across categories and standardise:
@@ -199,7 +234,8 @@ plot(baseline_model)
 
 baseline_model_interactions <- lm(satisfied_feedback ~ . + 
                                   students_staff_ratio:satisfied_teaching + 
-                                    avg_entry_tariff:continuation 
+                                    satisfied_teaching:spent_per_student
+                                    #avg_entry_tariff:continuation 
                                   #  avg_entry_tariff:RG
                                     , data = model_data)
 summary(baseline_model_interactions)
