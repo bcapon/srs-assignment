@@ -379,11 +379,47 @@ post.pred <- colMeans(posterior_predict(mod.brms))
 mse.mod.brms <- mean((model_data_glm$satisfied_feedback - post.pred)^2)
 
 
+## NEW BRMS model:
+## use prior with relatively small variance to keep coefficients near zero (L2 regularisation)
+coef_prior <- set_prior('normal(0, 1)', class = 'b')
+## use beta family to model scaled feedback in [0, 1] (/100 as feedback in [0, 100])
+brms_mod_interactions <- brm(satisfied_feedback/100 ~ . + I(satisfied_teaching^2)
+                              + I(continuation^2) 
+                              + satisfied_teaching:students_staff_ratio
+                              + POLAR4.Q1Q2:avg_entry_tariff
+                              + POLAR4.Q1Q2:added_value, data = model_data[, -c(9, 11)], ## exclude ethnicity and gender
+                             family = Beta(), prior = coef_prior, iter = 6000)
+summary(brms_mod_interactions)
+pp_check(brms_mod_interactions, ndraws = 30)
+## empirical cdf
+pp_check(brms_mod_interactions, type = 'ecdf_overlay', ndraws = 30)
+## scatter plot for average over posterior distributions
+pp_check(brms_mod_interactions, type = 'scatter_avg', ndraws = 30)
+
+post.pred <- colMeans(posterior_predict(brms_mod_interactions)) * 100 ## transform back
+cat("MSE brms with beta:", mean((model_data$satisfied_feedback - post.pred)^2))
+
+
 # LASSO (with CV)
 mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) 
 mod.glm.mse <- mean((model_data$satisfied_feedback - 
                        predict(mod.glm,newx = as.matrix(as.matrix(model_data[,-1]))))^2)
 coef(mod.glm) ## show coefficients
+
+
+
+## ELASTIC NET
+## include interactions and squared terms
+## (terminology here not completely right, continuation:continuation would normally
+## be equal to continuation, not continuation^2)
+data.glm <- create.interactions(c("satisfied_teaching:students_staff_ratio",
+                                  "POLAR4.Q1Q2:avg_entry_tariff", "POLAR4.Q1Q2:added_value",
+                                  'satisfied_teaching:satisfied_teaching', 'continuation:continuation'),
+                                model_data[, -c(1, 9, 11)]) ## exclude response, women, and ethnicity
+glm.elnet <- cv.glmnet(x = as.matrix(data.glm), y = model_data$satisfied_feedback, alpha = 0.5)  ## elastic net
+glm.elnet.mse <- mean((model_data$satisfied_feedback - 
+                       predict(glm.elnet,newx = as.matrix(data.glm)))^2)
+coef(glm.elnet) ## show coefficients
 
 ##   JAGS/INLA MODEL    ##
 
