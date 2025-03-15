@@ -109,7 +109,7 @@ sex_cols <- c("Men", "Women")
 
 # Plot histogram showing the response with a kde:
 par(mfrow = c(1,1))
-hist(data$satisfied_feedback, freq = FALSE, breaks = 10,ylim = c(0,0.12), col="lightblue") 
+hist(data$satisfied_feedback, freq = FALSE, breaks = 10, ylim = c(0,0.12), col="lightblue") 
 # Estimate density
 dens <- density(data$satisfied_feedback)
 # Overlay density curve
@@ -184,14 +184,21 @@ data[,cols[sex_cols]] <- data[,cols[sex_cols]] /
 # Other and mixed are small and there may be some overlap between these groups so
 # let's combine them for the model data and update col vectors:
 data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + data[,"Mixed.ethnic.group"]
+data[, "BAME"] <- 1 - data[,"White.ethnic.group"]
+ethnic_cols <- append(ethnic_cols,"BAME")
+
+# Combine POLAR4 quintiles 1 and 2 as these are used for contextual offers at
+# many UK Unis:
+data$POLAR4.Q1Q2 <- data$POLAR4.Q1 + data$POLAR4.Q2
+POLAR_cols <- append(POLAR_cols, "POLAR4.Q1Q2")
+
+# Reset the colnames vector
 cols = c(1:ncol(data))
 names(cols) = names(data)
-ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
-                 "Asian.ethnic.group", "Other.Mixed.ethnic.group")
 
-
-model_data <- data[cols[c(institutional_cols, outcome_cols, sex_cols[-1]
-                          #,POLAR_cols[-1], ethnic_cols[-1] # Add these later
+model_data <- data[cols[c(institutional_cols, outcome_cols, 
+                          sex_cols[-1], POLAR_cols[length(POLAR_cols)], 
+                          ethnic_cols[length(ethnic_cols)]
                           )]]
 model_data[,-1] <- scale(model_data[,-1])
 
@@ -203,48 +210,37 @@ RG <- c(G5, "Birmingham ", "Bristol ", "Cardiff ", "Durham ", "Edinburgh ",
         "Exeter ", "Glasgow ", "King's College London ", "Leeds ", "Liverpool ",
         "Manchester ", "Newcastle ", "Nottingham ",  "Queen Mary ", 
         "Queen's Belfast", "Sheffield ", "Southampton ", "Warwick ", "York ")
-model_data$G5 <- 0
-model_data[G5,]$G5 <- 1
+#model_data$G5 <- 0
+#model_data[G5,]$G5 <- 1
 model_data$RG <- 0
 model_data[RG,]$RG <- 1
-model_data$continuation_sq <- (model_data$continuation)^2
-model_data$satisfied_teaching_sq <- (model_data$satisfied_teaching)^2
-model_cols = c(1:ncol(model_data))
-names(model_cols) = names(model_data)
+
+# Update the cols to match the model data:
+cols = c(1:ncol(model_data))
+names(cols) = names(model_data)
 
 
-######                                MODELS                             ######
+######                             LINEAR MODEL                           ######
 
 # BASLINE MODEL
-baseline_model <- lm(satisfied_feedback ~ ., data = model_data)
+baseline_model <- lm(satisfied_feedback ~ ., data = model_data)# weights = data$Total
 summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
 
-# BASLINE MODEL WITH INTERACTIONS
-#result <- c()
-#for(ethnic in ethnic_cols[-1]){
-#  for(POLAR in POLAR_cols[-1]){
-#    result <- c(result, paste(ethnic, ":", POLAR, sep = ""))
-#  }
-#}
-#interactions <- paste(result, collapse = " + ")
-#baseline_model_interactions <- lm(as.formula(paste("satisfied_feedback ~ .", 
- #                               interactions, sep = " + ")), data = model_data)
+# Remove these two unis as they are outliers and are two subject specific.
+model_data <- model_data[!(row.names(model_data) %in% 
+                             c("University of the Arts London ", "SOAS ")),]
 
-baseline_model_interactions <- lm(satisfied_feedback ~ . + 
-                                  students_staff_ratio:satisfied_teaching + 
-                                    satisfied_teaching:spent_per_student
-                                    #avg_entry_tariff:continuation 
-                                  #  avg_entry_tariff:RG
-                                    , data = model_data)
-summary(baseline_model_interactions)
+# BASLINE MODEL without UAL and SOAS
+baseline_model <- lm(satisfied_feedback ~ ., data = model_data)# weights = data$Total
+summary(baseline_model)
 par(mfrow = c(2,2))
-plot(baseline_model_interactions)
+plot(baseline_model)
 
 i = 1
 par(mfrow = c(2,2))
-for(col in names(model_cols)[-1]){
+for(col in names(cols)[-1]){
   if(i%%4 == 0){
     par(mfrow = c(2,2))
   }
@@ -252,19 +248,70 @@ for(col in names(model_cols)[-1]){
   abline(h = 0)
 }
 
-# STEP MODEL
-step_model <- step(baseline_model_interactions, direction = "both")
+
+# BASLINE MODEL WITH INTERACTIONS
+#interaction_string <- function(cols1, cols2){
+ # result <- c()
+#  for(ethnic in cols1){
+#    for(POLAR in cols2){
+#      result <- c(result, paste(ethnic, ":", POLAR, sep = ""))
+#    }
+#  }
+#  interactions <- paste(result, collapse = " + ")
+#  return(interactions)
+#}
+#RG_interactions <- add_interactions(c("RG"), names(cols[-c(1,14)]))
+
+#model_interactions <- lm(as.formula(paste("satisfied_feedback ~ .", 
+ #                               RG_interactions, sep = " + ")), data = model_data)
+
+# Add the qudratic terms
+model_quadratics <- lm(satisfied_feedback ~ . + I(satisfied_teaching^2)
+                                  + I(continuation^2) 
+                                   ,data = model_data)
+summary(model_quadratics)
+par(mfrow = c(2,2))
+plot(model_quadratics)
+anova(model_quadratics, baseline_model) #Significant ***
+
+# Add some interactions
+model_interactions <- lm(satisfied_feedback ~ . + I(satisfied_teaching^2)
+                                  + I(continuation^2) 
+                                  + satisfied_teaching:students_staff_ratio 
+                                  + POLAR4.Q1Q2:avg_entry_tariff
+                                  + POLAR4.Q1Q2:added_value
+                                  ,data = model_data)
+summary(model_interactions)
+par(mfrow = c(2,2))
+plot(model_interactions)
+anova(model_interactions, model_quadratics) # Significant interactions *
+
+# Create a formula to use in GLM setting
+model_formula <- as.formula(satisfied_feedback ~ . + I(satisfied_teaching^2)
+                            + I(continuation^2) 
+                            + satisfied_teaching:students_staff_ratio 
+                            + POLAR4.Q1Q2:avg_entry_tariff
+                            + POLAR4.Q1Q2:added_value)
+
+# STEP model could also be used instead?
+step_model <- step(model_interactions, direction = "both")
 summary(step_model)
 par(mfrow = c(2,2))
 plot(step_model)
-
-## STEP MODEL WITH 2ND ORDER INTERACTIONS
-base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
-step_model_int <- step(base_model_int, direction = 'backward', trace = 0)
-summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> could use the terms in lasso to get the "most meaningful" ones
-plot(step_model_int)
+anova(step_model, model_interactions) # Smaller model (STEP) should be used.
 
 
+## STEP MODEL WITH 2ND ORDER INTERACTIONS.
+#base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
+#step_model_int <- step(base_model_int, direction = 'both', trace = 0)
+#summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> 
+#could use the terms in lasso to get the "most meaningful" ones
+#plot(step_model_int)
+#anova(base_model_int, model_interactions) 
+# model_interactions is smaller here and should be used.
+
+
+######                    Generalised Regression Model                    ######
 
 ## function to create interactions manually for lasso
 create.interactions <- function(interaction.names, data){
@@ -306,8 +353,9 @@ mse.mod.brms <- mean((model_data_glm$satisfied_feedback - post.pred)^2)
 
 
 # LASSO (with CV)
-mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) ## lasso regression
-mod.glm.mse <- mean((model_data$satisfied_feedback - predict(mod.glm, newx = as.matrix(as.matrix(model_data[,-1]))))^2)
+mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) 
+mod.glm.mse <- mean((model_data$satisfied_feedback - 
+                       predict(mod.glm,newx = as.matrix(as.matrix(model_data[,-1]))))^2)
 coef(mod.glm) ## show coefficients
 
 ##   JAGS/INLA MODEL    ##
@@ -341,7 +389,9 @@ Beta.Prior <- list(mean.intercept = 0, prec.intercept = 0.0001, mean = 0, prec =
 prec.prior <- list(prec = list(prior = "loggamma", param = c(1,0.11)))
 
 model1 <- inla(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg_entry_tariff
-               + career_after_15_month + continuation, data = data, family = "gamma",control.family = list(hyper=prec.prior), control.fixed = Beta.Prior,control.compute = list(cpo=TRUE, waic=TRUE))
+               + career_after_15_month + continuation, data = data, family = "gamma",
+               control.family = list(hyper=prec.prior), control.fixed = 
+                 Beta.Prior,control.compute = list(cpo=TRUE, waic=TRUE))
 
 cat("WAIC:",model1$waic$waic, "\n")
 cat("NSLCPO:",-sum(log(model1$cpo$cpo)), "\n")
