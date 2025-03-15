@@ -4,12 +4,8 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 
 ######                        NOTES/FUNCTIONS                            ######
 
-# Q1 is the 20% of areas with lowest participation in higher education
-# Women:Entry_tariff could be a good interaction
 # Need to fix TOTAL for CCCU if we use that column
-# Also need to fix the outlier in OTHER ETHNIC GROUP.
-# Avg entry tariff and women interaction
-
+# Also need to fix the outlier in OTHER ETHNIC GROUP. Won't if using BAME.
 
 # RESIDUAL PLOTS
 #residual_plots <- function(model, data, response) {
@@ -70,7 +66,7 @@ data$continuation <- as.numeric(data$continuation)
 # Look at other NA values in the data by column
 sapply(data, function(x) sum(is.na(x)))
 # Look at NA value of continuation. Appears to be just Falmouth so let's drop for
-# the time being:
+# the time being as we are unsure how to impute it fairly:
 data[is.na(data$cont), ]
 # Unsurprisingly Cambridge here (Oxford in most other years too). Assume the same
 # as Oxford due to their rivalry.
@@ -81,7 +77,7 @@ data["Cambridge ","satisfied_feedback"] = data["Oxford ","satisfied_feedback"]
 # Get column indices and names by using a named list/vector as a 'dictionary'.
 cols = c(1:ncol(data))
 names(cols) = names(data)
-# Remove SIMD data as useless and reset the column names:
+# Remove SIMD data as useless and reset the column indices and names:
 SIMD.cols <- which(substr(names(cols),1,4) == "SIMD")
 data = data[,-SIMD.cols]
 cols = c(1:ncol(data))
@@ -90,11 +86,7 @@ names(cols) = names(data)
 # Now we have all the columns of interest, remove the only remaining column with
 # an NA value (Falmouth) and get the new index:
 data <- na.omit(data)
-#cor(data[,-1])
 INSTITUTION_NAME <- rownames(data) 
-
-
-######                                EDA                               ######
 
 # Split the columns into their different types:
 institutional_cols <- c("satisfied_feedback", "satisfied_teaching", 
@@ -107,14 +99,36 @@ ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
 POLAR_cols <- c("POLAR4.Q5", "POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q4", "POLAR4.Q3")
 sex_cols <- c("Men", "Women")
 
+# The sums of these rows do not add to 100%. This indicates non respondents so
+# let's assume non-respondents are uniform across categories and standardise:
+rowSums(data[,cols[ethnic_cols]])
+rowSums(data[,cols[POLAR_cols]])
+rowSums(data[,cols[sex_cols]])
+data[,cols[ethnic_cols]] <- data[,cols[ethnic_cols]] / 
+  rowSums(data[,cols[ethnic_cols]])
+data[,cols[POLAR_cols]] <- data[,cols[POLAR_cols]] / 
+  rowSums(data[,cols[POLAR_cols]])
+data[,cols[sex_cols]] <- data[,cols[sex_cols]] / 
+  rowSums(data[,cols[sex_cols]])
+
+# N.B. we have a large outlier in Birmingham Newman Uni in the Other ethnic group.
+# Will need to deal with this if we use it in the model but leave for now.
+other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
+other_ethnic_outlier
+
+######                                EDA                               ######
+
 # Plot histogram showing the response with a kde:
 par(mfrow = c(1,1))
 hist(data$satisfied_feedback, freq = FALSE, breaks = 10, ylim = c(0,0.12), col="lightblue") 
-# Estimate density
+# Estimate the density
 dens <- density(data$satisfied_feedback)
-# Overlay density curve
+# Overlay the density curve
 lines(dens, col = "red")
+# This is approximately normal with a slight left skew. Let's look into this later.
 
+# Let's look at linear correlations of features with each other and with the 
+# response variable with scatterplots and a heatmap.
 i = 0
 for(col in names(cols)[-1]){
   if(i %% 4 == 0){
@@ -135,13 +149,34 @@ for(col in names(cols)[-1]){
   #  theme_minimal()  
   #print(plotted)
 }
+library(pheatmap)
+cor_matrix <- cor(data[,-1])
+pheatmap(cor_matrix,
+         color = colorRampPalette(c("blue", "white", "red"))(100),  # Color gradient
+         display_numbers = TRUE,  # Display correlation values
+         number_format = "%.2f",  # Format numbers to 2 decimal places
+         cluster_rows = FALSE,  # Disable row clustering
+         cluster_cols = FALSE)  # Disable column clustering
+pairs(data[,-1])
+# POLAR4 Q1-Q3 have positive correlations with feedback, Q4 has none, and Q5 is
+# negatively correlated.
+# Added_value and sex columns seem uncorrelated with feedback. Ethnicity columns
+# seem problematic to include despite having some correlations but they are small
+# and likely depend on economic background which we can't stratify by. e.g. a
+# uni with more POLAR5.Q5 does not imply the black students there are.
+# Continuation and satisfied_teaching looking a bit quadratic, consider later.
 
+# POLAR4.Q4 bad cor but the rest are good?? Added value and total: bad. Could do
+# feature engineering/transformations on ethnic/gender columns to improve but
+# overall not great.
 # Some boxplots to look at the distribution of all of the covariates grouped
 # by there type side by side:
 par(mfrow = c(1,1))
 boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
 boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
 boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col=rainbow(5))
+# Other and mixed ethnicities are small in percentages so can combine. No extreme
+# outliers here though.
 
 i = 0
 for(col in names(cols)[-1]){
@@ -155,70 +190,64 @@ for(col in names(cols)[-1]){
   lines(dens, col = "red")
   i = i + 1
 }
+# All relatively normal distributed but some are slightly skewed. Can consider
+# later.
 
-
-#pairs(data[,-1])
-# POLAR4.Q4 bad cor but the rest are good?? Added value and total: bad. Could do
-# feature engineering/transformations on ethnic/gender columns to improve but
-# overall not great.
-
-
-######                DATA CLEANING/FEATURE ENGINEERING?                ######
-
-# N.B. we have a large outlier in Birmingham Newman Uni in the Other ethnic group.
-#other_ethnic_outlier <- data[which(data$Other.ethnic.group==max(data$Other.ethnic.group)),]
-#other_ethnic_outlier
-
-# The sums of these rows do not add to 100%. This indicates non respondents so
-# let's assume non-respondents are uniform across categories and standardise:
-#rowSums(data[,cols[ethnic_cols]])
-#rowSums(data[,cols[POLAR_cols]])
-#rowSums(data[,cols[sex_cols]])
-data[,cols[ethnic_cols]] <- data[,cols[ethnic_cols]] / 
-                            rowSums(data[,cols[ethnic_cols]])
-data[,cols[POLAR_cols]] <- data[,cols[POLAR_cols]] / 
-                            rowSums(data[,cols[POLAR_cols]])
-data[,cols[sex_cols]] <- data[,cols[sex_cols]] / 
-                            rowSums(data[,cols[sex_cols]])
+######                FEATURE ENGINEERING?                ######
 
 # Other and mixed are small and there may be some overlap between these groups so
 # let's combine them for the model data and update col vectors:
-data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + data[,"Mixed.ethnic.group"]
+# data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + data[,"Mixed.ethnic.group"]
 data[, "BAME"] <- 1 - data[,"White.ethnic.group"]
 ethnic_cols <- append(ethnic_cols,"BAME")
+cor(data$BAME,data$satisfied_feedback)
+hist(data[,"BAME"], main = "BAME", xlab = "BAME", col = "lightblue", breaks = 10, freq = FALSE)
+dens <- density(data[,"BAME"])
+lines(dens, col = "red")
+# No correlations with satisfied feedback and right skewed.
 
 # Combine POLAR4 quintiles 1 and 2 as these are used for contextual offers at
 # many UK Unis:
 data$POLAR4.Q1Q2 <- data$POLAR4.Q1 + data$POLAR4.Q2
 POLAR_cols <- append(POLAR_cols, "POLAR4.Q1Q2")
+cor(data$POLAR4.Q1Q2,data$satisfied_feedback)
+hist(data[,"POLAR4.Q1Q2"], main = "POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2", col = "lightblue", breaks = 10, freq = FALSE)
+dens <- density(data[,"POLAR4.Q1Q2"])
+lines(dens, col = "red")
+# Decent correlationm so should include this. Slightly right skewed but otherwise good.
 
 # Reset the colnames vector
 cols = c(1:ncol(data))
 names(cols) = names(data)
 
-model_data <- data[cols[c(institutional_cols, outcome_cols, 
-                          sex_cols[-1], POLAR_cols[length(POLAR_cols)], 
-                          ethnic_cols[length(ethnic_cols)]
+model_data <- data[cols[c(institutional_cols, outcome_cols[-1], # Don't want added_value
+                          POLAR_cols[length(POLAR_cols)] # Only POLAR4.Q1Q2
+                        # ,ethnic_cols[length(ethnic_cols)],sex_cols[-1]
                           )]]
 model_data[,-1] <- scale(model_data[,-1])
 
-# Add two more columns representing the G5 and Russell Group Unis, remembering
-# to reset the col names vector.
+# Add the Russell Group unis as this is of particular interest in the UK when 
+# discussing universities.
 G5 <- c("Oxford ", "UCL ", "Imperial College ", "London School of Economics ", 
         "Cambridge ")
 RG <- c(G5, "Birmingham ", "Bristol ", "Cardiff ", "Durham ", "Edinburgh ",
         "Exeter ", "Glasgow ", "King's College London ", "Leeds ", "Liverpool ",
         "Manchester ", "Newcastle ", "Nottingham ",  "Queen Mary ", 
         "Queen's Belfast", "Sheffield ", "Southampton ", "Warwick ", "York ")
-#model_data$G5 <- 0
-#model_data[G5,]$G5 <- 1
 model_data$RG <- 0
 model_data[RG,]$RG <- 1
-
 # Update the cols to match the model data:
 cols = c(1:ncol(model_data))
 names(cols) = names(model_data)
 
+# Use a heatmap to see any multicolinearity with our final data
+cor_matrix <- cor(model_data)
+pheatmap(cor_matrix,
+         color = colorRampPalette(c("blue", "white", "red"))(100),  # Color gradient
+         display_numbers = TRUE,  # Display correlation values
+         number_format = "%.2f",  # Format numbers to 2 decimal places
+         cluster_rows = FALSE,  # Disable row clustering
+         cluster_cols = FALSE)  # Disable column clustering
 
 ######                             LINEAR MODEL                           ######
 
@@ -279,7 +308,6 @@ model_interactions <- lm(satisfied_feedback ~ . + I(satisfied_teaching^2)
                                   + I(continuation^2) 
                                   + satisfied_teaching:students_staff_ratio 
                                   + POLAR4.Q1Q2:avg_entry_tariff
-                                  + POLAR4.Q1Q2:added_value
                                   ,data = model_data)
 summary(model_interactions)
 par(mfrow = c(2,2))
@@ -290,8 +318,7 @@ anova(model_interactions, model_quadratics) # Significant interactions *
 model_formula <- as.formula(satisfied_feedback ~ . + I(satisfied_teaching^2)
                             + I(continuation^2) 
                             + satisfied_teaching:students_staff_ratio 
-                            + POLAR4.Q1Q2:avg_entry_tariff
-                            + POLAR4.Q1Q2:added_value)
+                            + POLAR4.Q1Q2:avg_entry_tariff)
 
 # STEP model could also be used instead?
 step_model <- step(model_interactions, direction = "both")
@@ -302,12 +329,12 @@ anova(step_model, model_interactions) # Smaller model (STEP) should be used.
 
 
 ## STEP MODEL WITH 2ND ORDER INTERACTIONS.
-#base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
-#step_model_int <- step(base_model_int, direction = 'both', trace = 0)
-#summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> 
+base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
+step_model_int <- step(base_model_int, direction = 'both', trace = 0)
+summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> 
 #could use the terms in lasso to get the "most meaningful" ones
-#plot(step_model_int)
-#anova(base_model_int, model_interactions) 
+plot(step_model_int)
+anova(base_model_int, model_interactions) 
 # model_interactions is smaller here and should be used.
 
 
