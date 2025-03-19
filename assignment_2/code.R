@@ -314,20 +314,20 @@ skew_prior <- set_prior('normal(-0.5, 0.1)', class = 'alpha')
 coef_prior <- set_prior('normal(0, 1)', class = 'b')
 
 # Normal #
-mod.brms <- brm(model_formula,
+mod.brms <- brm(model_formula_beta,
                 data = model_data, family = gaussian())
 # Skew Normal #
-mod.brms.sn <- brm(model_formula,
+mod.brms.sn <- brm(model_formula_beta,
                    data = model_data, family = skew_normal(), prior = c(skew_prior,
                                                                         coef_prior))
 # Beta #
 # use prior with relatively small variance to keep coefficients near zero (L2 regularisation)
 coef_prior <- set_prior('normal(0, 1)', class = 'b')
 # use beta family to model scaled feedback in [0, 1] (/100 as feedback in [0, 100])
-mod.brms.beta <- brm(model_formula, data = model_data, 
+mod.brms.beta <- brm(model_formula_beta, data = model_data, 
                      family = Beta(), prior = coef_prior, iter = 6000)
 # Student-t # 
-mod.brms.t <- brm(model_formula,
+mod.brms.t <- brm(model_formula_beta,
                    data = model_data, family = student(),)
 
 # Compare WAIC
@@ -380,5 +380,5 @@ pp_check(mod.brms.beta, type = 'scatter_avg', ndraws = 30)
 plot(mod.brms.sn)
 
 ## MSE of Beta
-post.pred <- colMeans(posterior_predict(brms_mod_interactions)) * 100 ## transform back
-cat("MSE brms with beta:", mean((model_data$satisfied_feedback - post.pred)^2))
+#post.pred <- colMeans(posterior_predict(brms_mod_interactions)) * 100 ## transform back
+#cat("MSE brms with beta:", mean((model_data$satisfied_feedback - post.pred)^2))
