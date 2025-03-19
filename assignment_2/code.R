@@ -6,53 +6,7 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 
 # ElasticNet needs to use an updated version of model.interactions as there    #
 # is now a 3 way interaction feature.                                          #
-
 # In GRM models, need to invert the link function to retrieve the actual coefs # 
-
-# Need to fix TOTAL for CCCU if we use that column
-# Also need to fix the outlier in OTHER ETHNIC GROUP. Won't if using BAME.
-
-# RESIDUAL PLOTS
-#residual_plots <- function(model, data, response) {
-  # Extract predicted values.
-  #predicted <- predict(model, data, type = "response")
-  # Compute residuals.
-  #residuals <- data[[response]] - predicted
-  # Standardize residuals.
-  #sigma_hat <- sd(residuals)
-  #residuals <- residuals / sigma_hat
-  # Initialize plots.
-  #par(mfrow = c(1, 3))
-  ## Residuals vs. Fitted plot.
-  #plot(predicted, residuals, main = "Residuals vs. Predicted",
-   #    xlab = "Predicted Values", ylab = paste("Residuals"), pch = 19)
-  #abline(h = 0, col = "red", lty = 2)
-  ## Histogram of Residuals.
-  #hist(residuals, breaks = 30, probability = TRUE, 
-   #    main = "Histogram of Residuals", xlab = paste("Residuals"))
-  #curve(dnorm(x, mean = mean(residuals), sd = sd(residuals)), 
-  #      add = TRUE, col = "blue")
-  ## Q-Q Plot.
-  #qqnorm(residuals, main = "Q-Q Plot of Residuals")
-  #qqline(residuals, col = "red", lwd = 2)
-#}
-
-
-# BASLINE MODEL WITH INTERACTIONS
-#interaction_string <- function(cols1, cols2){
-# result <- c()
-#  for(ethnic in cols1){
-#    for(POLAR in cols2){
-#      result <- c(result, paste(ethnic, ":", POLAR, sep = ""))
-#    }
-#  }
-#  interactions <- paste(result, collapse = " + ")
-#  return(interactions)
-#}
-#RG_interactions <- add_interactions(c("RG"), names(cols[-c(1,14)]))
-
-#model_interactions <- lm(as.formula(paste("satisfied_feedback ~ .", 
-#                         RG_interactions, sep = " + ")), data = model_data)
 
 ######                            IMPORTS                                ######
 
@@ -275,7 +229,7 @@ cor(data$POLAR4.Q1Q2,data$satisfied_feedback)
 
 # PCA ATTEMPTS?
 par(mfrow = c(1,1))
-pca_result <- prcomp(data[,c(POLAR_cols,ethnic_cols)], scale = TRUE)
+pca_result <- prcomp(data[,c(POLAR_cols[1:5],ethnic_cols[1:5])], scale = TRUE)
 screeplot(pca_result, type = "lines", main = "Scree Plot")
 
 # 3 components are needed to explain most of the variance in the model so let's
@@ -320,10 +274,7 @@ pheatmap(cor_matrix,
          cluster_rows = FALSE, # Hierachichal clustering is removed.
          cluster_cols = FALSE)
 
-
-######                             LINEAR MODEL                           ######
-
-# BASELINE MODEL
+# Lets start by using a frequentist linear model to see how suitable it it.
 baseline_model <- lm(satisfied_feedback ~ ., data = model_data)# weights = data$Total
 summary(baseline_model)
 par(mfrow = c(2,2))
@@ -332,65 +283,6 @@ plot(baseline_model)
 # Remove these two unis as they are outliers and are two subject specific.
 model_data <- model_data[!(row.names(model_data) %in% 
                              c("University of the Arts London ", "SOAS ")),]
-
-# BASLINE MODEL without UAL and SOAS
-baseline_model <- lm(satisfied_feedback ~ ., data = model_data)# weights = data$Total
-summary(baseline_model)
-par(mfrow = c(2,2))
-plot(baseline_model)
-
-# Look at the relationships between the covariates and the residuals.
-i = 1
-par(mfrow = c(2,2))
-for(col in names(model_cols)[-1]){
-  if(i%%4 == 0){
-    par(mfrow = c(2,2))
-  }
-  plot(model_data[,col], residuals(baseline_model), xlab = col)
-  abline(h = 0)
-}
-
-# The residual plots justify trying adding the qudratic terms mentioned earlier.
-model_quadratics <- lm(satisfied_feedback ~ . + I(satisfied_teaching^2)
-                                  + I(continuation^2) 
-                                   ,data = model_data)
-summary(model_quadratics)
-par(mfrow = c(2,2))
-plot(model_quadratics)
-anova(model_quadratics, baseline_model) #Significant ***
-
-# Add some interactions
-model_interactions <- lm(satisfied_feedback ~ . + I(satisfied_teaching^2)
-                                  + I(continuation^2) 
-                                  + satisfied_teaching:spent_per_student:students_staff_ratio
-                                  + POLAR4.Q1Q2:avg_entry_tariff
-                                  ,data = model_data)
-summary(model_interactions)
-par(mfrow = c(2,2))
-plot(model_interactions)
-anova(model_interactions, model_quadratics) # Significant interactions *
-
-# Create a formula to use in GLM setting
-model_formula <- as.formula(satisfied_feedback ~ . + I(satisfied_teaching^2)
-                            + I(continuation^2) 
-                            + satisfied_teaching:spent_per_student:students_staff_ratio
-                            + POLAR4.Q1Q2:avg_entry_tariff)
-
-# STEP model could also be used instead?
-step_model <- step(model_interactions, direction = "both")
-summary(step_model)
-par(mfrow = c(2,2))
-plot(step_model)
-anova(step_model, model_interactions) # Same model, perfect!
-
-## STEP MODEL WITH 2ND ORDER INTERACTIONS.
-base_model_int <- lm(satisfied_feedback ~ (.)^2, data = model_data)
-step_model_int <- step(base_model_int, direction = 'both', trace = 0)
-summary(step_model_int) ## higher R^2 (but probably too many coefficients) -> 
-#could use the terms in lasso to get the "most meaningful" ones
-plot(step_model_int)
-anova(base_model_int, model_interactions) 
-# This model doesn't outperform our carefully selected one which is a good sign.
 
 
 ######                    Generalised Regression Model                    ######
@@ -401,133 +293,92 @@ anova(base_model_int, model_interactions)
 # which can account for left skew. We will use the same linear predictor as 
 # before.
 
-
-## function to create interactions manually for lasso
-create.interactions <- function(interaction.names, data){
-  interactions <- interaction.names[grep(':', interaction.names)]
-  for (name in interactions){
-    name.split <- strsplit(name, ':')[[1]]
-    ## get individual names
-    name1 <- name.split[1]
-    name2 <- name.split[2]
-    ## add interaction (= product)
-    data[[name]] <- data[[name1]] * data[[name2]]
-  }
-  return(data)
-}
-
-#model_data_glm <- create.interactions(names(coef(step_model_int)), model_data)
-## step can lead to overfitting and unstable results
-#mod.glm.step <- cv.glmnet(x = as.matrix(model_data_glm[, -1]), y = model_data_glm$satisfied_feedback)
-#res.lasso <- coef(mod.glm.step) ## get rid of less significant interactions/covariates
-
-
 # BRMS (BAYESIAN REGRESSION MODELS USING STAN)
 
-## can also use brms (bayesian regression using stan) and the skew normal distribution
+## Can also use brms (bayesian regression using stan) and the skew normal distribution
 ## -> can capture the slightly skewed distribution
 
-## non-excluded features from lasso
-#non.excluded <- rownames(res.lasso)[which(res.lasso != 0)][-1]
-## add formula to brms automatically
-#brms.formula <- as.formula(paste("satisfied_feedback ~", 
- #                                paste(non.excluded, collapse = ' + ')))
-#mod.brms <- brm(brms.formula,
- #               data = model_data_glm, family = skew_normal())
-
-mod.brms <- brm(model_formula,
-                data = model_data, family = skew_normal())
-summary(mod.brms)
-pp_check(mod.brms)
-## MSE
-post.pred <- colMeans(posterior_predict(mod.brms))
-mse.mod.brms <- mean((model_data$satisfied_feedback - post.pred)^2)
+# Create a formula to use in GLM setting
+baseline_model_covariates<- paste(colnames(model_data)[-1], collapse = " + ")
+model_formula <- as.formula(paste(c("satisfied_feedback ~ ", baseline_model_covariates, 
+                                    " + I(satisfied_teaching^2) + I(continuation^2) + satisfied_teaching:spent_per_student:students_staff_ratio + POLAR4.Q1Q2:avg_entry_tariff"), collapse = ""))
+# A formula to confine satisfied_feedback to [0,1]
+model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", baseline_model_covariates, 
+                                         " + I(satisfied_teaching^2) + I(continuation^2) + satisfied_teaching:spent_per_student:students_staff_ratio + POLAR4.Q1Q2:avg_entry_tariff"), collapse = ""))
 
 
-## NEW BRMS model:
+## Fit the different brms models. ##
 
-# Create a new formula where we confine satisfied_feedback to [0,1]:
-model_formula2 <- as.formula(satisfied_feedback/100 ~ . + I(satisfied_teaching^2)
-                            + I(continuation^2) 
-                            + satisfied_teaching:spent_per_student:students_staff_ratio
-                            + POLAR4.Q1Q2:avg_entry_tariff)
-
-## use prior with relatively small variance to keep coefficients near zero (L2 regularisation)
+# Set priors
+skew_prior <- set_prior('normal(-0.5, 0.1)', class = 'alpha')
 coef_prior <- set_prior('normal(0, 1)', class = 'b')
-## use beta family to model scaled feedback in [0, 1] (/100 as feedback in [0, 100])
-brms_mod_interactions <- brm(model_formula2, data = model_data, 
-                             family = Beta(), prior = coef_prior, iter = 6000)
-summary(brms_mod_interactions)
-pp_check(brms_mod_interactions, ndraws = 30)
-## empirical cdf
-pp_check(brms_mod_interactions, type = 'ecdf_overlay', ndraws = 30)
-## scatter plot for average over posterior distributions
-pp_check(brms_mod_interactions, type = 'scatter_avg', ndraws = 30)
 
+# Normal #
+mod.brms <- brm(model_formula,
+                data = model_data, family = gaussian())
+# Skew Normal #
+mod.brms.sn <- brm(model_formula,
+                   data = model_data, family = skew_normal(), prior = c(skew_prior,
+                                                                        coef_prior))
+# Beta #
+# use prior with relatively small variance to keep coefficients near zero (L2 regularisation)
+coef_prior <- set_prior('normal(0, 1)', class = 'b')
+# use beta family to model scaled feedback in [0, 1] (/100 as feedback in [0, 100])
+mod.brms.beta <- brm(model_formula, data = model_data, 
+                     family = Beta(), prior = coef_prior, iter = 6000)
+# Student-t # 
+mod.brms.t <- brm(model_formula,
+                   data = model_data, family = student(),)
+
+# Compare WAIC
+waic_normal <- waic(mod.brms)
+waic_skewnormal <- waic(mod.brms.sn)
+waic_beta <- waic(mod.brms.beta)
+waic_t <- waic(mod.brms.t)
+
+# Compute looic
+loo_normal <- loo(mod.brms)
+loo_skewnormal <- loo(mod.brms.sn)
+loo_beta <- loo(mod.brms.beta)
+loo_t <- loo(mod.brms.t)
+
+# Compare WAIC and looic for each model
+data.frame(model = c("Normal", "Skew Normal", "Beta", "Student-t"),
+           waic = c(waic_normal$waic, waic_skewnormal$waic,
+                    waic_beta$waic, waic_t$waic),
+           loo = c(loo_normal$looic, loo_skewnormal$looic,
+                   loo_beta$looic, loo_t$looic))
+# Appears Beta is the best model but interpretation is a bit trickier. Let's
+# see if it is worth it from posterior predictive checks.
+
+# Skew Normal
+summary(mod.brms.sn)
+pp_check(mod.brms.sn, ndraws = 30)
+pp_check(mod.brms.sn, type = "stat", stat = "mean")
+pp_check(mod.brms.sn, type = "stat", stat = "median")
+pp_check(mod.brms.sn, type = "stat", stat = "min")
+pp_check(mod.brms.sn, type = "stat", stat = "max")
+pp_check(mod.brms.sn, type = "stat", stat = "skewness")
+
+## Beta
+summary(mod.brms.beta)
+pp_check(mod.brms.beta, ndraws = 30)
+pp_check(mod.brms.beta, type = "stat", stat = "mean")
+pp_check(mod.brms.beta, type = "stat", stat = "median")
+pp_check(mod.brms.beta, type = "stat", stat = "min")
+pp_check(mod.brms.beta, type = "stat", stat = "max")
+pp_check(mod.brms.beta, type = "stat", stat = "skewness")
+pp_check(mod.brms.beta, type = "stat", stat = "sd")
+
+# It appears that the Beta model outshines the skew normal in almost every way.
+# Lets look at some more plots to check for convergence.
+## empirical cdf
+pp_check(mod.brms.beta, type = 'ecdf_overlay', ndraws = 30)
+## scatter plot for average over posterior distributions
+pp_check(mod.brms.beta, type = 'scatter_avg', ndraws = 30)
+# Traceplots
+plot(mod.brms.sn)
+
+## MSE of Beta
 post.pred <- colMeans(posterior_predict(brms_mod_interactions)) * 100 ## transform back
 cat("MSE brms with beta:", mean((model_data$satisfied_feedback - post.pred)^2))
-
-
-# LASSO (with CV)
-mod.glm <- cv.glmnet(x = as.matrix(model_data[,-1]), y = model_data$satisfied_feedback) 
-mod.glm.mse <- mean((model_data$satisfied_feedback - 
-                       predict(mod.glm,newx = as.matrix(as.matrix(model_data[,-1]))))^2)
-coef(mod.glm) ## show coefficients
-
-
-
-## ELASTIC NET
-## include interactions and squared terms
-## (terminology here not completely right, continuation:continuation would normally
-## be equal to continuation, not continuation^2)
-#data.glm <- create.interactions(c("satisfied_teaching:spent_per_student:students_staff_ratio"
-#                                  ,"POLAR4.Q1Q2:avg_entry_tariff",
-#                                  'satisfied_teaching:satisfied_teaching', 'continuation:continuation'),
-#                                model_data[, -model_cols["satisfied_feedback"]]) ## exclude response
-#glm.elnet <- cv.glmnet(x = as.matrix(data.glm), y = model_data$satisfied_feedback, alpha = 0.5)  ## elastic net
-#glm.elnet.mse <- mean((model_data$satisfied_feedback - 
-#                       predict(glm.elnet,newx = as.matrix(data.glm)))^2)
-#coef(glm.elnet) ## show coefficients
-
-
-##                                JAGS/INLA MODEL                             ##
-
-# Generate x values for curves
-#x_vals <- seq(min(data$satisfied_teaching), max(data$satisfied_teaching), length.out = 100)
-# Fit distributions
-#fit_gamma <- fitdistr(data$satisfied_teaching, "gamma")
-#fit_lognorm <- fitdistr(data$satisfied_teaching, "lognormal")
-#fit_exp <- fitdistr(data$satisfied_teaching, "exponential")
-#fit_weibull <- fitdistr(data$satisfied_teaching, "weibull")
-# Overlay fitted distribution curves
-#curve(dgamma(x, shape = fit_gamma$estimate["shape"], rate = fit_gamma$estimate["rate"]), 
-#      col = "red", lwd = 2, add = TRUE)
-
-#curve(dlnorm(x, meanlog = fit_lognorm$estimate["meanlog"], sdlog = fit_lognorm$estimate["sdlog"]), 
-#      col = "green", lwd = 2, add = TRUE, lty = 2)
-
-#curve(dexp(x, rate = fit_exp$estimate["rate"]), 
-#      col = "purple", lwd = 2, add = TRUE, lty = 3)
-
-#curve(dweibull(x, shape = fit_weibull$estimate["shape"], scale = fit_weibull$estimate["scale"]), 
-#      col = "orange", lwd = 2, add = TRUE, lty = 4)
-# Add legend
-#legend("topright", legend = c("Gamma", "Log-Normal", "Exponential", "Weibull"), 
-#       col = c("red", "green", "purple", "orange"), lwd = 2, lty = c(1, 2, 3, 4))
-
-
-# Specify a Gamma prior for variance (in the INLA model)
-#Beta.Prior <- list(mean.intercept = 0, prec.intercept = 0.0001, mean = 0, prec = 0.0001)
-#prec.prior <- list(prec = list(prior = "loggamma", param = c(1,0.11)))
-
-#model1 <- inla(model_formula, data = model_data, family = "gamma",
-#               control.family = list(hyper=prec.prior), control.fixed = 
-#                 Beta.Prior,control.compute = list(cpo=TRUE, waic=TRUE))
-
-#cat("WAIC:",model1$waic$waic, "\n")
-#cat("NSLCPO:",-sum(log(model1$cpo$cpo)), "\n")
-#summary(model1)           
-
-#model2<- glm(satisfied_teaching ~ satisfied_feedback + spent_per_student + avg_entry_tariff
-#             + career_after_15_month + continuation, data = data, family = Gamma)
-#summary(model2)
