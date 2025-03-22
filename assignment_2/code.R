@@ -356,7 +356,7 @@ model_checks <- function(model){
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
       theme(plot.title = element_text(hjust = 0.6)) +
       ylab("Density")
-    if(stat == "skewness"){
+    if(summary_statistics[i] == "skewness"){
       fig <- fig + xlab("Skew")  
     }else{
       fig <- fig + xlab("Satisfied Feedback")
