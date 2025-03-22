@@ -355,7 +355,8 @@ model_checks <- function(model){
     fig <- pp_check(model, type = "stat", stat = summary_statistics[i]) +
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
       theme(plot.title = element_text(hjust = 0.6)) +
-      ylab("Density")
+      ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0))) +
+      scale_fill_manual(values = rgb(4/255.0, 30/255.0, 66/255.0, 0.7))
     if(summary_statistics[i] == "skewness"){
       fig <- fig + xlab("Skew")  
     }else{
@@ -367,7 +368,8 @@ model_checks <- function(model){
     ggtitle("Posterior Predictive Check of Distribution") + 
     theme(plot.title = element_text(hjust = 0.6)) +
     xlab("Satisfied Feedback") + 
-    ylab("Density")
+    ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0),
+                                                    rgb(4/255.0, 30/255.0, 66/255.0, 1))
 }
 model_checks(mod.brms)
 model_checks(mod.brms.beta)
