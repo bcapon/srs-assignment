@@ -364,7 +364,9 @@ model_checks <- function(model){
   summary_statistics_titles <- c("Mean", "Median", "Minimum", "Maximum",
                                  "Skewness", "Standard Devation")
   for(i in 1:length(summary_statistics)){
-    fig <- pp_check(model, type = "stat", stat = summary_statistics[i]) +
+    ppcheck <- pp_check(model, type = "stat", stat = summary_statistics[i])
+    ppcheck$layers[[2]]$aes_params$linewidth <- 2.5
+    fig <- ppcheck +
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
       theme(plot.title = element_text(hjust = 0.6, size = 30),
             axis.title = element_text(size = 30),
@@ -380,11 +382,20 @@ model_checks <- function(model){
     }
     print(fig)
   }
-  pp_check(mod.brms, ndraws = 30) + 
-    ggtitle("Posterior Predictive Check of Distribution") + 
-    theme(plot.title = element_text(hjust = 0.6)) +
+  ppcheck <- pp_check(model, ndraws = 30)
+  ppcheck + ggtitle("Posterior Predictive Check of Distribution") + 
+    theme(plot.title = element_text(hjust = 0.6, size = 30),
+          axis.title = element_text(size = 30),
+          axis.text = element_text(size = 30),
+          legend.text = element_text(size = 30),
+          legend.title = element_text(size = 30)) +
+    geom_line(data = data.frame(x = density(model$data$`satisfied_feedback/100`)$x,
+                                y = density(model$data$`satisfied_feedback/100`)$y),
+              aes(x = x, y = y),
+              color = rgb(193/255.0, 0, 67/255.0), size = 2.5) +
     xlab("Satisfied Feedback") + 
-    ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0), rgb(4/255.0, 30/255.0, 66/255.0, 1)))
+    ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0),
+                                                    rgb(4/255.0, 30/255.0, 66/255.0, 1)))
 }
 model_checks(mod.brms)
 model_checks(mod.brms.beta)
