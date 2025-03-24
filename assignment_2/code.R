@@ -1,5 +1,6 @@
 #setwd("/Users/cyrusseyrafi/Documents/GitHub/srs-assignment/assignment_2")
 setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
+#setwd('/Users/user/Documents/Statistics with Data Science/Semester 2/Statistical Research Skills/Assignment2&3')
 
 
 ######                        NOTES/UNUSED CODE                           ######
@@ -127,9 +128,9 @@ for(col in names(cols)[-1]){
   abline(model, col="red")
   i = i + 1
   ## GGPLOT2 VERSION
- # print(col)
+  # print(col)
   #plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
-   # geom_point() +
+  # geom_point() +
   #  geom_smooth(method = "lm", se = TRUE) + 
   #  theme_minimal()  
   #print(plotted)
@@ -152,12 +153,18 @@ pairs(data[,-1])
 # Continuation and satisfied_teaching looking a bit quadratic so could try these
 # as terms in a linear model.
 
+## edinburgh colours
+edi_blue = rgb(4/255.0, 30/255.0, 66/255.0)
+edi_red = rgb(193/255.0, 0, 67/255.0)
+
 # Some boxplots to look at the distribution of all of the covariates grouped
 # by there type side by side.
 par(mfrow = c(1,1))
 boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
 # Lots more Women in higher education than men as expected. No extreme outliers 
 # here.
+
+boxplot(data[,POLAR_cols], main = "Distribution of POLAR4 Scores")
 boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
 # Clear increasing trend with POLAR4 scores so their use appears justified 
 # in the use of contextual offers. POLAR4.5 has the largest IQR by far.
@@ -253,8 +260,8 @@ cols = c(1:ncol(data))
 names(cols) = names(data)
 model_data <- data[cols[c(institutional_cols, outcome_cols[-1], # Don't want added_value
                           POLAR_cols[length(POLAR_cols)] # Only POLAR4.Q1Q2
-                        # ,ethnic_cols[length(ethnic_cols)],sex_cols[-1]
-                          )]]
+                          # ,ethnic_cols[length(ethnic_cols)],sex_cols[-1]
+)]]
 
 # Make a new named vector for columns in the model dataframe.
 model_cols = c(1:ncol(model_data))
@@ -262,7 +269,7 @@ names(model_cols) = names(model_data)
 
 # Scale all but the response variable and binary column in the model dataset.
 model_data[,-model_cols[c("satisfied_feedback", "RG")]] <- scale(
-                            model_data[,-model_cols[c("satisfied_feedback", "RG")]])
+  model_data[,-model_cols[c("satisfied_feedback", "RG")]])
 
 # Use a heatmap to see any correlations with the response and any
 # multicolinearity with our final data.
@@ -277,7 +284,7 @@ pheatmap(cor_matrix,
 
 covariates_added <- paste(colnames(model_data)[-1], collapse = " + ")
 model_formula <- as.formula(paste(c("satisfied_feedback/100 ~ ", covariates_added, 
-                                         " + I(satisfied_teaching^2) + I(continuation^2)"), collapse = ""))
+                                    " + I(satisfied_teaching^2) + I(continuation^2)"), collapse = ""))
 baseline_model <- lm(model_formula, data = model_data)
 summary(baseline_model)
 par(mfrow = c(2,2))
@@ -293,6 +300,9 @@ baseline_model <- lm(model_formula, data = model_data)
 summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
+
+
+
 # We now see a lot of left skew which is similar to the response.
 
 ######                    Generalised Regression Model                    ######
@@ -311,22 +321,24 @@ model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", covariates
 ## Fit the different brms models. ##
 
 # Set priors
-skew_prior <- set_prior('normal(-0.5, 1)', class = 'alpha')
-coef_prior <- set_prior('normal(0, 10)', class = 'b')
+#skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
+coef_prior <- set_prior('normal(0, 100^2)', class = 'b')
+phi_prior <- set_prior('gamma(1, 0.01)', class = 'phi')
 
 # Normal #
 mod.brms <- brm(model_formula_beta,
-                data = model_data, family = gaussian())
+                data = model_data, family = gaussian(), iter = 5000)
 # Skew Normal #
 mod.brms.sn <- brm(model_formula_beta,
                    data = model_data, family = skew_normal(), prior = c(skew_prior,
-                                                                        coef_prior))
+                                                                        coef_prior), iter = 5000)
+
 # Beta #
 mod.brms.beta <- brm(model_formula_beta, data = model_data, 
-                     family = Beta(), prior = coef_prior, iter = 6000)
+                     family = Beta(), prior = c(coef_prior, phi_prior), iter = 5000)
 # Student-t # 
 mod.brms.t <- brm(model_formula_beta,
-                   data = model_data, family = student())
+                  data = model_data, family = student(), iter = 5000)
 
 # Compute looic
 loo_normal <- loo(mod.brms) #,  to fix high k Pareto
@@ -354,7 +366,11 @@ model_checks <- function(model){
   for(i in 1:length(summary_statistics)){
     fig <- pp_check(model, type = "stat", stat = summary_statistics[i]) +
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
-      theme(plot.title = element_text(hjust = 0.6)) +
+      theme(plot.title = element_text(hjust = 0.6, size = 30),
+            axis.title = element_text(size = 30),
+            axis.text = element_text(size = 30),
+            legend.text = element_text(size = 30),
+            legend.title = element_text(size = 30)) +
       ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0))) +
       scale_fill_manual(values = rgb(4/255.0, 30/255.0, 66/255.0))
     if(summary_statistics[i] == "skewness"){
@@ -368,8 +384,7 @@ model_checks <- function(model){
     ggtitle("Posterior Predictive Check of Distribution") + 
     theme(plot.title = element_text(hjust = 0.6)) +
     xlab("Satisfied Feedback") + 
-    ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0),
-                                                    rgb(4/255.0, 30/255.0, 66/255.0, 1))
+    ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0), rgb(4/255.0, 30/255.0, 66/255.0, 1)))
 }
 model_checks(mod.brms)
 model_checks(mod.brms.beta)
