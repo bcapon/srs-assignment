@@ -321,38 +321,44 @@ model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", covariates
 ## Fit the different brms models. ##
 
 # Set priors
-#skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
-coef_prior <- set_prior('normal(0, 100^2)', class = 'b')
+skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
+coef_prior <- set_prior('normal(0, 10)', class = 'b')
+intercept_prior <- set_prior('normal(0, 10)', class = 'Intercept')
 phi_prior <- set_prior('gamma(1, 0.01)', class = 'phi')
+sigma_prior <- set_prior('gamma(1, 0.01)', class = 'sigma')
 
 # Normal #
 mod.brms <- brm(model_formula_beta,
-                data = model_data, family = gaussian(), iter = 5000)
-# Skew Normal #
+                data = model_data, 
+                family = gaussian(), 
+                prior = c(coef_prior, intercept_prior, sigma_prior),
+                iter = 5000)
+
+#  Skew Normal #
 mod.brms.sn <- brm(model_formula_beta,
-                   data = model_data, family = skew_normal(), prior = c(skew_prior,
-                                                                        coef_prior), iter = 5000)
+                   data = model_data, 
+                   family = skew_normal(),
+                   prior = c(coef_prior, intercept_prior, sigma_prior,skew_prior),
+                   iter = 5000)
 
 # Beta #
-mod.brms.beta <- brm(model_formula_beta, data = model_data, 
-                     family = Beta(), prior = c(coef_prior, phi_prior), iter = 5000)
-# Student-t # 
-mod.brms.t <- brm(model_formula_beta,
-                  data = model_data, family = student(), iter = 5000)
+mod.brms.beta <- brm(model_formula_beta, 
+                     data = model_data, 
+                     family = Beta(), 
+                     prior = c(coef_prior, intercept_prior, phi_prior), 
+                     iter = 5000)
 
 # Compute looic
 loo_normal <- loo(mod.brms) #,  to fix high k Pareto
 loo_skewnormal <- loo(mod.brms.sn)
 loo_beta <- loo(mod.brms.beta)
-loo_t <- loo(mod.brms.t)
 
 # Compare looic for each model
-data.frame(model = c("Normal", "Skew Normal", "Beta", "Student-t"),
+data.frame(model = c("Normal", "Skew Normal", "Beta"),
            loo = c(loo_normal$looic, loo_skewnormal$looic,
-                   loo_beta$looic, loo_t$looic))
-
+                   loo_beta$looic))
 loo_compare(loo_normal, loo_skewnormal,
-            loo_beta, loo_t)
+            loo_beta)
 # Appears Beta is the best model but interpretation is a bit trickier. Let's
 # see if it is worth it from posterior predictive checks.
 
