@@ -166,6 +166,13 @@ boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
 
 boxplot(data[,POLAR_cols], main = "Distribution of POLAR4 Scores")
 boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
+
+boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores",
+        col=rgb(4/255.0, 30/255.0, 66/255.0), whiskcol = rgb(193/255.0, 0, 67/255.0),
+        staplecol = rgb(193/255.0, 0, 67/255.0), border = 'white',
+        outcol = rgb(193/255.0, 0, 67/255.0), boxwex = 0.7, cex.main = 2,
+        cex.axis = 1.6, las = 1, whisklwd = 3, staplelwd = 3,
+        medlwd = 4, medcol = rgb(193/255.0, 0, 67/255.0))
 # Clear increasing trend with POLAR4 scores so their use appears justified 
 # in the use of contextual offers. POLAR4.5 has the largest IQR by far.
 boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col=rainbow(5))
