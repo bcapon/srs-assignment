@@ -1,5 +1,5 @@
-#setwd("/Users/cyrusseyrafi/Documents/GitHub/srs-assignment/assignment_2")
-setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
+setwd("/Users/cyrusseyrafi/Documents/GitHub/srs-assignment/assignment_2")
+#setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
 #setwd('/Users/user/Documents/Statistics with Data Science/Semester 2/Statistical Research Skills/Assignment2&3')
 
 
@@ -15,6 +15,7 @@ library(ggplot2)
 library(brms)
 library(fBasics)
 library(showtext)
+library(curl)
 font_add_google("Lato", "lato") # Font loading
 showtext_auto()
 
