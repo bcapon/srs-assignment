@@ -162,7 +162,7 @@ edi_red = rgb(193/255.0, 0, 67/255.0)
 
 # Some boxplots to look at the distribution of all of the covariates grouped
 # by there type side by side.
-par(mfrow = c(1,1))
+par(mfrow = c(1,1), family = 'lato')
 boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
 # Lots more Women in higher education than men as expected. No extreme outliers 
 # here.
