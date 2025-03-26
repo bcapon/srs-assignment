@@ -14,7 +14,9 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 library(ggplot2)
 library(brms)
 library(fBasics)
-
+library(showtext)
+font_add_google("Lato", "lato") # Font loading
+showtext_auto()
 
 ######                       READ DATA + CLEAN                           ######
 
@@ -345,7 +347,7 @@ mod.brms <- brm(model_formula_beta,
 mod.brms.sn <- brm(model_formula_beta,
                    data = model_data, 
                    family = skew_normal(),
-                   prior = c(coef_prior, intercept_prior, sigma_prior,skew_prior),
+                   prior = c(coef_prior, intercept_prior, sigma_prior, skew_prior),
                    iter = 5000)
 
 # Beta #
@@ -356,7 +358,7 @@ mod.brms.beta <- brm(model_formula_beta,
                      iter = 5000)
 
 # Compute looic
-loo_normal <- loo(mod.brms) #,  to fix high k Pareto
+loo_normal <- loo(mod.brms) 
 loo_skewnormal <- loo(mod.brms.sn)
 loo_beta <- loo(mod.brms.beta)
 
@@ -381,11 +383,11 @@ model_checks <- function(model){
     ppcheck$layers[[2]]$aes_params$linewidth <- 2.5
     fig <- ppcheck +
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
-      theme(plot.title = element_text(hjust = 0.6, size = 30),
-            axis.title = element_text(size = 30),
-            axis.text = element_text(size = 30),
-            legend.text = element_text(size = 30),
-            legend.title = element_text(size = 30)) +
+      theme(plot.title = element_text(family = "lato", hjust = 0.6, size = 30),
+            axis.title = element_text(family = "lato", size = 30),
+            axis.text = element_text(family = "lato", size = 30),
+            legend.text = element_text(family = "lato", size = 30),
+            legend.title = element_text(family = "lato", size = 30)) +
       ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0))) +
       scale_fill_manual(values = rgb(4/255.0, 30/255.0, 66/255.0))
     if(summary_statistics[i] == "skewness"){
@@ -397,11 +399,11 @@ model_checks <- function(model){
   }
   ppcheck <- pp_check(model, ndraws = 30)
   ppcheck + ggtitle("Posterior Predictive Check of Distribution") + 
-    theme(plot.title = element_text(hjust = 0.6, size = 30),
-          axis.title = element_text(size = 30),
-          axis.text = element_text(size = 30),
-          legend.text = element_text(size = 30),
-          legend.title = element_text(size = 30)) +
+    theme(plot.title = element_text(family = "lato", hjust = 0.6, size = 30),
+          axis.title = element_text(family = "lato", size = 30),
+          axis.text = element_text(family = "lato", size = 30),
+          legend.text = element_text(family = "lato", size = 30),
+          legend.title = element_text(family = "lato", size = 30)) +
     geom_line(data = data.frame(x = density(model$data$`satisfied_feedback/100`)$x,
                                 y = density(model$data$`satisfied_feedback/100`)$y),
               aes(x = x, y = y),
@@ -421,3 +423,6 @@ pp_check(mod.brms.beta, type = 'ecdf_overlay', ndraws = 30)
 pp_check(mod.brms.beta, type = 'scatter_avg', ndraws = 30)
 # Traceplots
 plot(mod.brms.beta)
+
+# To get corresponding odds for the coefficient estimates and credible intervals.
+print(round(exp(fixef(mod.brms.beta)),3))
