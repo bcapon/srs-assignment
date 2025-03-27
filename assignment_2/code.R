@@ -422,8 +422,12 @@ model_checks <- function(model){
                                                     rgb(4/255.0, 30/255.0, 66/255.0, 1)))
 }
 # Baseline model checks
+#The baseline model fits the data fairly well however there is room for improvement.
 model_checks(mod.brms)
 # New and improved Beta model checks
+#The posterior predictive checks reveal the Beta model approximates the key features
+#of the data well. The posterior predictive mean, maximum and standard deviation 
+# are especially well approximated.
 model_checks(mod.brms.beta)
 
 # It appears that the Beta model outshines the skew normal in almost every way.
