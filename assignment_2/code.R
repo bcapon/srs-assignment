@@ -1,25 +1,27 @@
 #setwd("/Users/cyrusseyrafi/Documents/GitHub/srs-assignment/assignment_2")
-#setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
+setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignment/assignment_2")
 #setwd('/Users/user/Documents/Statistics with Data Science/Semester 2/Statistical Research Skills/Assignment2&3')
 
 
-######                        NOTES/UNUSED CODE                           ######
+################################################################################
+#####                             IMPORTS                                  #####
+################################################################################
 
-# ElasticNet needs to use an updated version of model.interactions as there    #
-# is now a 3 way interaction feature.                                          #
-# In GRM models, need to invert the link function to retrieve the actual coefs # 
-
-######                            IMPORTS                                ######
 
 library(ggplot2)
 library(brms)
 library(fBasics)
+library(showtext)
+library(curl)
+font_add_google("Lato", "lato")
+showtext_auto()
 
+################################################################################
+#####                        READ AND CLEAN DATA                           #####
+################################################################################
 
-######                       READ DATA + CLEAN                           ######
 
 # Read the data and read the first few rows.
-#data = read.csv("C:/Users/niege/srs-assignment/assignment_2/data.csv")
 data = read.csv("data.csv")
 head(data)
 # Set the index for the data through the INSTITUTION_NAME.
@@ -102,9 +104,12 @@ other_ethnic_outlier
 # column in the modelling.
 
 
-######                                EDA                               ######
+################################################################################
+#####                 Exploratory Data Analysis (EDA)                      #####
+################################################################################
 
-# Plot histogram showing the response, before adding the KDE to look at the shape.
+
+# Plot histogram showing the response, before adding the kde to look at the shape.
 par(mfrow = c(1,1))
 hist(data$satisfied_feedback, freq = FALSE, breaks = 10, 
      ylim = c(0,0.12), col="lightblue") 
@@ -160,13 +165,20 @@ edi_red = rgb(193/255.0, 0, 67/255.0)
 
 # Some boxplots to look at the distribution of all of the covariates grouped
 # by there type side by side.
-par(mfrow = c(1,1))
+par(mfrow = c(1,1), family = 'lato')
 boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
 # Lots more Women in higher education than men as expected. No extreme outliers 
 # here.
 
 boxplot(data[,POLAR_cols], main = "Distribution of POLAR4 Scores")
 boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
+
+boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores",
+        col=rgb(4/255.0, 30/255.0, 66/255.0), whiskcol = rgb(193/255.0, 0, 67/255.0),
+        staplecol = rgb(193/255.0, 0, 67/255.0), border = 'white',
+        outcol = rgb(193/255.0, 0, 67/255.0), boxwex = 0.7, cex.main = 2,
+        cex.axis = 1.6, las = 1, whisklwd = 3, staplelwd = 3,
+        medlwd = 4, medcol = rgb(193/255.0, 0, 67/255.0))
 # Clear increasing trend with POLAR4 scores so their use appears justified 
 # in the use of contextual offers. POLAR4.5 has the largest IQR by far.
 boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col=rainbow(5))
@@ -188,15 +200,17 @@ for(col in names(cols)[-1]){
   lines(dens, col = "red")
   i = i + 1
 }
-# All relatively normally distributed but some are slightly skewed. Can consider
-# the skewness of the covariates in the modelling.
+# All relatively normally distributed but some are slightly skewed. 
 
+################################################################################
+#####                     Feature Engineering                              #####
+################################################################################
 
-######                FEATURE ENGINEERING?                ######
 
 # Other and mixed ethnicity are small and there may be some overlap between 
 # these groups so let's combine them for the model data and update col vectors:
-data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + data[,"Mixed.ethnic.group"]
+data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + 
+                                      data[,"Mixed.ethnic.group"]
 
 # UK universities tend to have "BAME" groups. It should be noted these are seldom
 # used in admissions, where POLAR4 quantiles are a larger decider on contextual
@@ -206,10 +220,12 @@ ethnic_cols <- append(ethnic_cols, c("BAME", "Other.Mixed.ethnic.group"))
 
 # Let's now plot and see whether there are any trends with the response variable.
 par(mfrow = c(2,2))
-plot(data[,"BAME"], data$satisfied_feedback, col="lightblue", main="BAME", xlab = "BAME")
+plot(data[,"BAME"], data$satisfied_feedback, col="lightblue", 
+     main="BAME", xlab = "BAME")
 model <- lm(data$satisfied_feedback ~ data[,"BAME"])
 abline(model, col="red")
-hist(data[,"BAME"], main = "BAME", xlab = "BAME", col = "lightblue", breaks = 10, freq = FALSE)
+hist(data[,"BAME"], main = "BAME", xlab = "BAME", col = "lightblue", 
+     breaks = 10, freq = FALSE)
 dens <- density(data[,"BAME"])
 lines(dens, col = "red")
 cor(data$BAME,data$satisfied_feedback)
@@ -223,26 +239,18 @@ cor(data$BAME,data$satisfied_feedback)
 data$POLAR4.Q1Q2 <- data$POLAR4.Q1 + data$POLAR4.Q2
 POLAR_cols <- append(POLAR_cols, "POLAR4.Q1Q2")
 
-plot(data[,"POLAR4.Q1Q2"], data$satisfied_feedback, col="lightblue", main="POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2")
+plot(data[,"POLAR4.Q1Q2"], data$satisfied_feedback, col="lightblue", 
+     main="POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2")
 model <- lm(data$satisfied_feedback ~ data[,"POLAR4.Q1Q2"])
 abline(model, col="red")
-hist(data[,"POLAR4.Q1Q2"], main = "POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2", col = "lightblue", breaks = 10, freq = FALSE)
+hist(data[,"POLAR4.Q1Q2"], main = "POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2", 
+     col = "lightblue", breaks = 10, freq = FALSE)
 dens <- density(data[,"POLAR4.Q1Q2"])
 lines(dens, col = "red")
 cor(data$POLAR4.Q1Q2,data$satisfied_feedback)
 
 # Decent correlationm so should include this. Slightly right skewed but otherwise 
 # seems like a good feature to include.
-
-# PCA ATTEMPTS?
-par(mfrow = c(1,1))
-pca_result <- prcomp(data[,c(POLAR_cols[1:5],ethnic_cols[1:5])], scale = TRUE)
-screeplot(pca_result, type = "lines", main = "Scree Plot")
-
-# 3 components are needed to explain most of the variance in the model so let's
-# add these to the dataset.
-data <- cbind(data, pca_result$x[,1:3])
-PCA_cols <- c("PC1", "PC2", "PC3")
 
 # Add the Russell Group unis as this is of particular interest in the UK when 
 # discussing universities.
@@ -259,7 +267,7 @@ institutional_cols <- append(institutional_cols, "RG")
 # Reset the colnames vector and select the covariates we want to include.
 cols = c(1:ncol(data))
 names(cols) = names(data)
-model_data <- data[cols[c(institutional_cols, outcome_cols[-1], # Don't want added_value
+model_data <- data[cols[c(institutional_cols, outcome_cols[-1], 
                           POLAR_cols[length(POLAR_cols)] # Only POLAR4.Q1Q2
                           # ,ethnic_cols[length(ethnic_cols)],sex_cols[-1]
 )]]
@@ -301,59 +309,74 @@ baseline_model <- lm(model_formula, data = model_data)
 summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
-
-
-
 # We now see a lot of left skew which is similar to the response.
 
-######                    Generalised Regression Model                    ######
+
+################################################################################
+#####                             MODEL                                    #####
+################################################################################
+
 
 # Let's new fit a Bayesian Linear Regression model using brms
 
 # Our Linear Model  fits the response variable well but we have some left skew.
-# This is unsurprising due to the skewness we can see in the earlier histograms. 
+# This is unsurprising due to the skewage we can see in the earlier histograms. 
 # Let's expand our work to a GLM which can account for left skew. We will use 
 # the same linear predictor as before.
 
 # A formula to confine satisfied_feedback to [0,1] so we can use the Beta model.
-model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", covariates_added, 
-                                         " + I(satisfied_teaching^2) + I(continuation^2)"), collapse = ""))
+quadratic_features <- " + I(satisfied_teaching^2) + I(continuation^2)"
+model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", 
+                                         covariates_added, 
+                                         quadratic_features), collapse = ""))
 
 ## Fit the different brms models. ##
 
 # Set priors
-#skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
-coef_prior <- set_prior('normal(0, 100^2)', class = 'b')
-phi_prior <- set_prior('gamma(1, 0.01)', class = 'phi')
+skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
+coef_prior <- set_prior('normal(0, 10)', class = 'b')
+intercept_prior <- set_prior('normal(0, 10)', class = 'Intercept')
+phi_prior <- set_prior('gamma(0.01, 0.01)', class = 'phi')
+sigma_prior <- set_prior('gamma(0.01, 0.01)', class = 'sigma')
 
 # Normal #
 mod.brms <- brm(model_formula_beta,
-                data = model_data, family = gaussian(), iter = 5000)
-# Skew Normal #
+                data = model_data, 
+                family = gaussian(), 
+                prior = c(coef_prior, intercept_prior, sigma_prior),
+                iter = 5000)
+
+#  Skew Normal #
 mod.brms.sn <- brm(model_formula_beta,
-                   data = model_data, family = skew_normal(), prior = c(skew_prior,
-                                                                        coef_prior), iter = 5000)
+                   data = model_data, 
+                   family = skew_normal(),
+                   prior = c(coef_prior, intercept_prior, sigma_prior, skew_prior),
+                   iter = 5000)
 
 # Beta #
-mod.brms.beta <- brm(model_formula_beta, data = model_data, 
-                     family = Beta(), prior = c(coef_prior, phi_prior), iter = 5000)
-# Student-t # 
-mod.brms.t <- brm(model_formula_beta,
-                  data = model_data, family = student(), iter = 5000)
+mod.brms.beta <- brm(model_formula_beta, 
+                     data = model_data, 
+                     family = Beta(), 
+                     prior = c(coef_prior, intercept_prior, phi_prior), 
+                     iter = 5000)
+
+
+################################################################################
+#####                             RESULTS                                  #####
+################################################################################
+
 
 # Compute looic
-loo_normal <- loo(mod.brms) #,  to fix high k Pareto
+loo_normal <- loo(mod.brms) 
 loo_skewnormal <- loo(mod.brms.sn)
 loo_beta <- loo(mod.brms.beta)
-loo_t <- loo(mod.brms.t)
 
 # Compare looic for each model
-data.frame(model = c("Normal", "Skew Normal", "Beta", "Student-t"),
+data.frame(model = c("Normal", "Skew Normal", "Beta"),
            loo = c(loo_normal$looic, loo_skewnormal$looic,
-                   loo_beta$looic, loo_t$looic))
-
+                   loo_beta$looic))
 loo_compare(loo_normal, loo_skewnormal,
-            loo_beta, loo_t)
+            loo_beta)
 # Appears Beta is the best model but interpretation is a bit trickier. Let's
 # see if it is worth it from posterior predictive checks.
 
@@ -369,11 +392,11 @@ model_checks <- function(model){
     ppcheck$layers[[2]]$aes_params$linewidth <- 2.5
     fig <- ppcheck +
       ggtitle(paste("Posterior Predictive Check of", summary_statistics_titles[i])) + 
-      theme(plot.title = element_text(hjust = 0.6, size = 30),
-            axis.title = element_text(size = 30),
-            axis.text = element_text(size = 30),
-            legend.text = element_text(size = 30),
-            legend.title = element_text(size = 30)) +
+      theme(plot.title = element_text(family = "lato", hjust = 0.6, size = 30),
+            axis.title = element_text(family = "lato", size = 30),
+            axis.text = element_text(family = "lato", size = 30),
+            legend.text = element_text(family = "lato", size = 30),
+            legend.title = element_text(family = "lato", size = 30)) +
       ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0))) +
       scale_fill_manual(values = rgb(4/255.0, 30/255.0, 66/255.0))
     if(summary_statistics[i] == "skewness"){
@@ -385,11 +408,11 @@ model_checks <- function(model){
   }
   ppcheck <- pp_check(model, ndraws = 30)
   ppcheck + ggtitle("Posterior Predictive Check of Distribution") + 
-    theme(plot.title = element_text(hjust = 0.6, size = 30),
-          axis.title = element_text(size = 30),
-          axis.text = element_text(size = 30),
-          legend.text = element_text(size = 30),
-          legend.title = element_text(size = 30)) +
+    theme(plot.title = element_text(family = "lato", hjust = 0.6, size = 30),
+          axis.title = element_text(family = "lato", size = 30),
+          axis.text = element_text(family = "lato", size = 30),
+          legend.text = element_text(family = "lato", size = 30),
+          legend.title = element_text(family = "lato", size = 30)) +
     geom_line(data = data.frame(x = density(model$data$`satisfied_feedback/100`)$x,
                                 y = density(model$data$`satisfied_feedback/100`)$y),
               aes(x = x, y = y),
@@ -398,16 +421,37 @@ model_checks <- function(model){
     ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0),
                                                     rgb(4/255.0, 30/255.0, 66/255.0, 1)))
 }
+# Baseline model checks
 model_checks(mod.brms)
+# New and improved Beta model checks
 model_checks(mod.brms.beta)
 
 # It appears that the Beta model outshines the skew normal in almost every way.
 # Lets look at some more plots to check for convergence.
+
 # Empirical cdf- this revealed that the beta model fits the data very well and 
 #accounts for the skewness of the data. 
 pp_check(mod.brms.beta, type = 'ecdf_overlay', ndraws = 30)
-# Scatter plot for average over posterior distributions. Majority of points are close 
-#to the diagonal (with only minor deviations), showing that the model fit is good. 
-pp_check(mod.brms.beta, type = 'scatter_avg', ndraws = 30)
-# Traceplots- The traceplot shows good mixing of the model.
+# Scatter plot for average over posterior distributions. Majority of points are 
+# close to the diagonal (with only minor deviations), showing that the model fit.
 plot(mod.brms.beta)
+
+# Define an expit function to inverse the link.
+expit <- function(x) exp(x)/(1+exp(x))
+# Calculate the feedback statisfaction proportion baseline
+p_intercept <- expit(fixef(mod.brms.beta)[1,1])
+
+# We now calculate the increase or decrease in the feedback satisfaction
+# proportion for 1 unit (1 sd) of a covariate by calculating the difference
+# with the baseline. There are 11 coefficients so initialise + loop through:
+p_diff <- numeric(11)
+p_diff[1] <- p_intercept
+for(i in 2:11){
+  p_diff[i] <- (expit(sum(fixef(mod.brms.beta)[c(1,i),1])) - p_intercept)
+}
+
+# It's easier to report these as percentages in a table so let's do this now:
+p_diff <- p_diff * 100
+p_diff_df <- data.frame(p_diff, row.names = c(colnames(model_data), "Satisfied_teaching^2", 
+                                              "Continuation^2"))
+p_diff_df
