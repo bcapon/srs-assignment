@@ -9,12 +9,14 @@ setwd("C:/Users/BCapo/Desktop/University of Edinburgh Masters/Sem 2/srs-assignme
 
 
 library(ggplot2)
-library(brms)
+library(pheatmap)
 library(fBasics)
+library(brms)
 library(showtext)
 library(curl)
 font_add_google("Lato", "lato")
 showtext_auto()
+
 
 ################################################################################
 #####                        READ AND CLEAN DATA                           #####
@@ -38,25 +40,26 @@ summary(data)
 # Total seems to have an outlier at the maximum when compared to the 3rd 
 # quartile but we don't anticipate on using this column so we can leave it.
 # Can see from summaries that continuation appears to be a character column when
-# it should be numeric. FIX CONTINUATION BY LOOKING AT IT.
+# it should be numeric so let's have a look at why.
 data$continuation
-# APPEARS TO BE "n/a" so replace with NA and convert it to a numeric column.
+# Appears TO BE "n/a" as a string instead of NA so replace with NA and convert
+# to a numeric column.
 data$continuation <- gsub("n/a", NA, data$continuation)
 data$continuation <- as.numeric(data$continuation)
 
-# Look at other NA values in the data by column
-sapply(data, function(x) sum(is.na(x)))
-# Look at NA value of continuation. Appears to be just Falmouth so let's drop as
-# we don't want to make assumptions about their continuation.
+# Look at NA value of continuation now.
 data[is.na(data$cont), ]
+# Appears to be just Falmouth so let's drop as we don't want to make assumptions
+# about their continuation.
 
-# Our other NA value is in satisfied feedback. Unsurprisingly Cambridge here 
-#(Oxford in most other years too). Assume the same as Oxford due to rivalry.
+# Our other NA value is in satisfied feedback so let's find it.
 data[is.na(data$satisfied_feedback), ]
+# Unsurprisingly Cambridge here (Oxford in many other years too). Assume the 
+# same as Oxford due to rivalry.
 data["Cambridge ","satisfied_teaching"] <- data["Oxford ","satisfied_teaching"]
 data["Cambridge ","satisfied_feedback"] <- data["Oxford ","satisfied_feedback"]
 
-# Get column indices and names by using a named vector as a 'dictionary'.
+# Get column indices and names by using a named vector.
 cols = c(1:ncol(data))
 names(cols) = names(data)
 # Remove SIMD data as useless and reset the column indices and names.
@@ -81,7 +84,7 @@ ethnic_cols <- c("White.ethnic.group", "Black.ethnic.group",
 POLAR_cols <- c("POLAR4.Q1", "POLAR4.Q2", "POLAR4.Q3", "POLAR4.Q4", "POLAR4.Q5")
 sex_cols <- c("Men", "Women")
 
-# Check that the percentages add to 100 for these columns.
+# Check that the percentages add to 100 for these percentage columns.
 rowSums(data[,cols[ethnic_cols]])
 rowSums(data[,cols[POLAR_cols]])
 rowSums(data[,cols[sex_cols]])
@@ -109,70 +112,65 @@ other_ethnic_outlier
 ################################################################################
 
 
-# Plot histogram showing the response, before adding the kde to look at the shape.
+# Plot histogram showing the response and add the KDE to look at the shape.
 par(mfrow = c(1,1))
 hist(data$satisfied_feedback, freq = FALSE, breaks = 10, 
-     ylim = c(0,0.12), col="lightblue") 
+     ylim = c(0,0.12), col="lightblue", main = "Histogram of Satisfied Feedback") 
 dens <- density(data$satisfied_feedback)
 lines(dens, col = "red")
-# This is approximately normal with a slight left skew. It's not too extreme so
-# lets leave it for now.
+skewness(data$satisfied_feedback)
+# This is approximately normal with a moderate left skew. Common transformations
+# such as log or sqrt have not proved effective here at reducing it.
 
 # Let's look at linear correlations of features with each other and with the 
-# response variable using scatter plots, a heatmap, and a pairplot.
+# response variable using scatter plots, a heatmap, and a pairplot. Iterate 
+# through each column:
 i = 0
 for(col in names(cols)[-1]){
+  # Ensures 4x4 grids for plots.
   if(i %% 4 == 0){
     par(mfrow = c(2,2))
   }
-  # Plot the scatterplot
+  # Plot the scatterplot.
   plot(data[,col], data$satisfied_feedback, col="lightblue", 
        main=col, xlab = col)
-  # Fit a linear model and add the line to the scatterplot
+  # Fit a linear model and add the line to the scatterplot.
   model <- lm(data$satisfied_feedback ~ data[,col])
-  # Add Regression Line
   abline(model, col="red")
+  # Add to the indicator for plot number.
   i = i + 1
-  ## GGPLOT2 VERSION
-  # print(col)
-  #plotted <- ggplot(data[,-1], aes(x = .data[[col]], y = satisfied_feedback)) +
-  # geom_point() +
-  #  geom_smooth(method = "lm", se = TRUE) + 
-  #  theme_minimal()  
-  #print(plotted)
 }
-library(pheatmap)
+# Now plot the correlation matrix, excluding the insitution column
 cor_matrix <- cor(data[,-1])
 pheatmap(cor_matrix,
          display_numbers = TRUE,  # Display correlation values
-         number_format = "%.2f",  # Format numbers to 2 decimal places
-         cluster_rows = FALSE,  # Remove hieracichal clustering
-         cluster_cols = FALSE)  
+         number_format = "%.2f",  # Format numbers to 2 decimal places.
+         cluster_rows = FALSE,    # Remove hieracichal clustering in rows
+         cluster_cols = FALSE)    # and in cols.
+# Plot the pairs and visualise in full screen as there are a lot.
 pairs(data[,-1])
-
 # POLAR4 Q1-Q3 have positive correlations with feedback, Q4 has none, and Q5 is
 # negatively correlated.
 # Added_value and sex columns seem uncorrelated with feedback. Ethnicity columns
 # seem problematic to include despite having some correlations but they are tiny
 # and likely depend on economic background which we can't stratify by. e.g. a
-# uni with more POLAR5.Q5 does not imply the black students there are.
-# Continuation and satisfied_teaching looking a bit quadratic so could try these
+# university with more POLAR5.Q5 does not imply the black students there are.
+# Continuation and satisfied_teaching look a bit quadratic so could try these
 # as terms in a linear model.
 
-## edinburgh colours
+# Define Edinburgh colours in RGB.
 edi_blue = rgb(4/255.0, 30/255.0, 66/255.0)
 edi_red = rgb(193/255.0, 0, 67/255.0)
 
-# Some boxplots to look at the distribution of all of the covariates grouped
+# Some box plots to look at the distribution of all of the covariates grouped
 # by there type side by side.
-par(mfrow = c(1,1), family = 'lato')
-boxplot(data[,sex_cols], main="Distribution of Sex", col=rainbow(5))
+boxplot(data[,sex_cols], main="Distribution of Sex", col="lightblue")
 # Lots more Women in higher education than men as expected. No extreme outliers 
-# here.
+# here though.
 
-boxplot(data[,POLAR_cols], main = "Distribution of POLAR4 Scores")
-boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores", col=rainbow(5))
-
+# Plot the POLAR4 Scores. This is particularly interesting so ensure arguments 
+# can improve visualisation so it can be included in a poster.
+par(mfrow = c(1,1), family = 'lato')
 boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores",
         col=rgb(4/255.0, 30/255.0, 66/255.0), whiskcol = rgb(193/255.0, 0, 67/255.0),
         staplecol = rgb(193/255.0, 0, 67/255.0), border = 'white',
@@ -181,15 +179,18 @@ boxplot(data[,POLAR_cols], main="Distribution of POLAR4 Scores",
         medlwd = 4, medcol = rgb(193/255.0, 0, 67/255.0))
 # Clear increasing trend with POLAR4 scores so their use appears justified 
 # in the use of contextual offers. POLAR4.5 has the largest IQR by far.
-boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col=rainbow(5))
+
+# Display the ethnicity columns as a box plot too.
+boxplot(data[,ethnic_cols], main="Distribution of Ethnicities", col="lightblue")
 # Other and mixed ethnicity are small in percentages so can combine. Can see
-# Birmingham Newman Uni in the other ethnic group as an outlier. Therest look
+# Birmingham Newman Uni in the other ethnic group as an outlier. The rest look
 # fine.
 
 # Let's look at the distributions of each of the covariates by plotting 
-# histograms and kdes.
+# histograms and KDEs to see whether they are normally distributed or not.
 i = 0
 for(col in names(cols)[-1]){
+  # Ensures 4x4 grids for plots.
   if(i %% 4 == 0){
     par(mfrow = c(2,2))
   }
@@ -198,19 +199,17 @@ for(col in names(cols)[-1]){
   dens <- density(data[,col])
   # Overlay density curve
   lines(dens, col = "red")
+  # Add to the indicator for plot number
   i = i + 1
 }
-# All relatively normally distributed but some are slightly skewed. 
+# All relatively normally distributed but some are slightly skewed. Nothing 
+# terrible though.
+
 
 ################################################################################
 #####                     Feature Engineering                              #####
 ################################################################################
 
-
-# Other and mixed ethnicity are small and there may be some overlap between 
-# these groups so let's combine them for the model data and update col vectors:
-data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] + 
-                                      data[,"Mixed.ethnic.group"]
 
 # UK universities tend to have "BAME" groups. It should be noted these are seldom
 # used in admissions, where POLAR4 quantiles are a larger decider on contextual
@@ -218,17 +217,14 @@ data[, "Other.Mixed.ethnic.group"] <- data[,"Other.ethnic.group"] +
 data[, "BAME"] <- 1 - data[,"White.ethnic.group"]
 ethnic_cols <- append(ethnic_cols, c("BAME", "Other.Mixed.ethnic.group"))
 
-# Let's now plot and see whether there are any trends with the response variable.
+# Let's now plot and see whether there are any trends with the response variable
+# by fitting a lm and displaying the fit.
 par(mfrow = c(2,2))
 plot(data[,"BAME"], data$satisfied_feedback, col="lightblue", 
      main="BAME", xlab = "BAME")
 model <- lm(data$satisfied_feedback ~ data[,"BAME"])
 abline(model, col="red")
-hist(data[,"BAME"], main = "BAME", xlab = "BAME", col = "lightblue", 
-     breaks = 10, freq = FALSE)
-dens <- density(data[,"BAME"])
-lines(dens, col = "red")
-cor(data$BAME,data$satisfied_feedback)
+cat("Correlation is",cor(data$BAME,data$satisfied_feedback))
 # No correlations with satisfied feedback and right skewed. Differences in 
 # economic background lead to substantial differences in life experiences between
 # wealthy and poor BAME students and we can't stratify by this so let's leave it
@@ -243,17 +239,12 @@ plot(data[,"POLAR4.Q1Q2"], data$satisfied_feedback, col="lightblue",
      main="POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2")
 model <- lm(data$satisfied_feedback ~ data[,"POLAR4.Q1Q2"])
 abline(model, col="red")
-hist(data[,"POLAR4.Q1Q2"], main = "POLAR4.Q1Q2", xlab = "POLAR4.Q1Q2", 
-     col = "lightblue", breaks = 10, freq = FALSE)
-dens <- density(data[,"POLAR4.Q1Q2"])
-lines(dens, col = "red")
-cor(data$POLAR4.Q1Q2,data$satisfied_feedback)
+cat("Correlation is", cor(data$POLAR4.Q1Q2,data$satisfied_feedback))
+# Decent correlation so should include this. Slightly right skewed but otherwise 
+# seems like a good feature to include. 
 
-# Decent correlationm so should include this. Slightly right skewed but otherwise 
-# seems like a good feature to include.
-
-# Add the Russell Group unis as this is of particular interest in the UK when 
-# discussing universities.
+# Add the Russell Group (RG) unis as this is of particular interest in the UK when 
+# discussing universities. G5 are all a part of the RG.
 G5 <- c("Oxford ", "UCL ", "Imperial College ", "London School of Economics ", 
         "Cambridge ")
 RG <- c(G5, "Birmingham ", "Bristol ", "Cardiff ", "Durham ", "Edinburgh ",
@@ -264,13 +255,14 @@ data$RG <- 0
 data[RG,]$RG <- 1
 institutional_cols <- append(institutional_cols, "RG")
 
-# Reset the colnames vector and select the covariates we want to include.
+# Reset the colnames vector and select the covariates we want to include. We 
+# will avoid the sex and ethnicity columns for the reasons mentioned previously.
+# We also avoid using the added value column due to it's insignificant 
+# correlation with the response variable.
 cols = c(1:ncol(data))
 names(cols) = names(data)
 model_data <- data[cols[c(institutional_cols, outcome_cols[-1], 
-                          POLAR_cols[length(POLAR_cols)] # Only POLAR4.Q1Q2
-                          # ,ethnic_cols[length(ethnic_cols)],sex_cols[-1]
-)]]
+                          POLAR_cols[length(POLAR_cols)])]]
 
 # Make a new named vector for columns in the model dataframe.
 model_cols = c(1:ncol(model_data))
@@ -284,13 +276,14 @@ model_data[,-model_cols[c("satisfied_feedback", "RG")]] <- scale(
 # multicolinearity with our final data.
 cor_matrix <- cor(model_data)
 pheatmap(cor_matrix,
-         display_numbers = TRUE,  # Display correlation values
-         number_format = "%.2f",  # Use 2 decimal places
-         cluster_rows = FALSE, # Hierachichal clustering is removed.
-         cluster_cols = FALSE)
+         display_numbers = TRUE, # Display correlation values
+         number_format = "%.2f", # Use 2 decimal places
+         cluster_rows = FALSE,   # Hierarchical clustering is removed for rows
+         cluster_cols = FALSE)   # and cols.
 
-# Lets start by using a frequentist linear model to see how suitable it is.
-
+# Lets start by using a frequentist linear model to see how suitable it is. We
+# define the satisfied feedback as the proportion of students who rated they 
+# were satisfied. Define the model formula, get the summaries, and plot.
 covariates_added <- paste(colnames(model_data)[-1], collapse = " + ")
 model_formula <- as.formula(paste(c("satisfied_feedback/100 ~ ", covariates_added, 
                                     " + I(satisfied_teaching^2) + I(continuation^2)"), collapse = ""))
@@ -299,8 +292,9 @@ summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
 
-# Remove these three unis as they are outliers and rather different to the 
-# majority of the other universities.
+# Remove these three unis as they are outliers and rather different
+# to the majority of the other universities in that they are specialised 
+# London Unviersities.
 model_data <- model_data[!(row.names(model_data) %in% 
                              c("University of the Arts London ", "SOAS ", "Goldsmiths ")),]
 
@@ -309,7 +303,7 @@ baseline_model <- lm(model_formula, data = model_data)
 summary(baseline_model)
 par(mfrow = c(2,2))
 plot(baseline_model)
-# We now see a lot of left skew which is similar to the response.
+# This is better but we see a left skew so let's move to trying some more models.
 
 
 ################################################################################
@@ -317,44 +311,34 @@ plot(baseline_model)
 ################################################################################
 
 
-# Let's new fit a Bayesian Linear Regression model using brms
-
 # Our Linear Model  fits the response variable well but we have some left skew.
-# This is unsurprising due to the skewage we can see in the earlier histograms. 
+# This is unsurprising due to the skewness we can see in the earlier histograms. 
 # Let's expand our work to a GLM which can account for left skew. We will use 
-# the same linear predictor as before.
+# the same linear predictor as before and use brms to implement the models.
 
-# A formula to confine satisfied_feedback to [0,1] so we can use the Beta model.
-quadratic_features <- " + I(satisfied_teaching^2) + I(continuation^2)"
-model_formula_beta <- as.formula(paste(c("satisfied_feedback/100 ~ ", 
-                                         covariates_added, 
-                                         quadratic_features), collapse = ""))
-
-## Fit the different brms models. ##
-
-# Set priors
+# Set priors on all parameters as follows before defining the models:
 skew_prior <- set_prior('normal(-0.5, 0.5)', class = 'alpha')
 coef_prior <- set_prior('normal(0, 10)', class = 'b')
 intercept_prior <- set_prior('normal(0, 10)', class = 'Intercept')
-phi_prior <- set_prior('gamma(0.01, 0.01)', class = 'phi')
-sigma_prior <- set_prior('gamma(0.01, 0.01)', class = 'sigma')
+phi_prior <- set_prior('gamma(1, 0.01)', class = 'phi')
+sigma_prior <- set_prior("exponential(10)",class="sigma")
 
-# Normal #
-mod.brms <- brm(model_formula_beta,
+# Normal Model.
+mod.brms <- brm(model_formula,
                 data = model_data, 
                 family = gaussian(), 
-                prior = c(coef_prior, intercept_prior, sigma_prior),
+                prior = c(coef_prior, intercept_prior,sigma_prior), 
                 iter = 5000)
 
-#  Skew Normal #
-mod.brms.sn <- brm(model_formula_beta,
+#  Skew Normal Model.
+mod.brms.sn <- brm(model_formula,
                    data = model_data, 
                    family = skew_normal(),
                    prior = c(coef_prior, intercept_prior, sigma_prior, skew_prior),
                    iter = 5000)
 
-# Beta #
-mod.brms.beta <- brm(model_formula_beta, 
+# Beta Model.
+mod.brms.beta <- brm(model_formula, 
                      data = model_data, 
                      family = Beta(), 
                      prior = c(coef_prior, intercept_prior, phi_prior), 
@@ -366,7 +350,7 @@ mod.brms.beta <- brm(model_formula_beta,
 ################################################################################
 
 
-# Compute looic
+# Compute loo-cv for each model
 loo_normal <- loo(mod.brms) 
 loo_skewnormal <- loo(mod.brms.sn)
 loo_beta <- loo(mod.brms.beta)
@@ -421,21 +405,20 @@ model_checks <- function(model){
     ylab("Density") + scale_color_manual(values = c(rgb(193/255.0, 0, 67/255.0),
                                                     rgb(4/255.0, 30/255.0, 66/255.0, 1)))
 }
+
 # Baseline model checks
-#The baseline model fits the data fairly well however there is room for improvement.
 model_checks(mod.brms)
+# The baseline model fits the data fairly well however there is 
+# room for improvement.
+
 # New and improved Beta model checks
+model_checks(mod.brms.beta)
 #The posterior predictive checks reveal the Beta model approximates the key features
 #of the data well. The posterior predictive mean, maximum and standard deviation 
 # are especially well approximated.
-model_checks(mod.brms.beta)
 
-# It appears that the Beta model outshines the skew normal in almost every way.
-# Lets look at some more plots to check for convergence.
+# Lets look at some more plots to check for convergence of the Beta model.
 
-# Empirical cdf- this revealed that the beta model fits the data very well and 
-#accounts for the skewness of the data. 
-pp_check(mod.brms.beta, type = 'ecdf_overlay', ndraws = 30)
 # Scatter plot for average over posterior distributions. Majority of points are 
 # close to the diagonal (with only minor deviations), showing that the model fit.
 plot(mod.brms.beta)
